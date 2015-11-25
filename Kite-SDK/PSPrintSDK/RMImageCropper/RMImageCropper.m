@@ -311,7 +311,7 @@ CGFloat const RESET_DURATION = 0.10f;
             return initImage;
             break;
             
-        case UIImageOrientationUpMirrored: //EXIF = 2
+        case UIImageOrientationDownMirrored: //EXIF = 2
             transform = CGAffineTransformMakeTranslation(imageSize.width, 0.0);
             transform = CGAffineTransformScale(transform, -1.0, 1.0);
             break;
@@ -321,12 +321,12 @@ CGFloat const RESET_DURATION = 0.10f;
             transform = CGAffineTransformRotate(transform, 0);
             break;
             
-        case UIImageOrientationDownMirrored: //EXIF = 4
+        case UIImageOrientationUpMirrored: //EXIF = 4
             transform = CGAffineTransformMakeTranslation(0.0, imageSize.height);
             transform = CGAffineTransformScale(transform, 1.0, -1.0);
             break;
             
-        case UIImageOrientationLeftMirrored: //EXIF = 5
+        case UIImageOrientationRightMirrored: //EXIF = 5
             boundHeight = bounds.size.height;
             bounds.size.height = bounds.size.width;
             bounds.size.width = boundHeight;
@@ -343,7 +343,7 @@ CGFloat const RESET_DURATION = 0.10f;
             transform = CGAffineTransformRotate(transform, 3.0 * M_PI / 2.0);
             break;
             
-        case UIImageOrientationRightMirrored: //EXIF = 7
+        case UIImageOrientationLeftMirrored: //EXIF = 7
             boundHeight = bounds.size.height;
             bounds.size.height = bounds.size.width;
             bounds.size.width = boundHeight;
@@ -659,6 +659,10 @@ CGFloat const RESET_DURATION = 0.10f;
 
 #pragma mark - Size & Translation
 
+- (BOOL)isCorrecting{
+    return self.elasticityTimer || self.decelerationTimer;
+}
+
 - (void)correctSizeAndTranslationErrors
 {
     if ([self isImageSizeOutOfBounds])
@@ -680,6 +684,12 @@ CGFloat const RESET_DURATION = 0.10f;
 
 #pragma mark - Gesture Handlers
 
+- (void)notifyDelegateOfTransform {
+    if ([self.delegate respondsToSelector:@selector(imageCropperDidTransformImage:)]) {
+        [self.delegate imageCropperDidTransformImage:self];
+    }
+}
+
 - (void)pinchRecognized:(UIPinchGestureRecognizer *)recognizer
 {
     if (self.enabled)
@@ -694,6 +704,8 @@ CGFloat const RESET_DURATION = 0.10f;
         {
             [self correctSizeAndTranslationErrors];
         }
+        
+        [self notifyDelegateOfTransform];
     }
 }
 
@@ -712,13 +724,17 @@ CGFloat const RESET_DURATION = 0.10f;
             CGPoint velocity = [recognizer velocityInView:self.imageView];
             [self startDecelerationWithVelocity:velocity];
         }
+        
+        [self notifyDelegateOfTransform];
     }
 }
 
 - (void)tapRecognized:(UITapGestureRecognizer *)recognizer
 {
-    if (self.tapped != nil)
+    if (self.tapped != nil) {
         self.tapped();
+        [self notifyDelegateOfTransform];
+    }
 }
 
 - (void)doubleTapRecognized:(UITapGestureRecognizer *)recognizer
@@ -735,6 +751,7 @@ CGFloat const RESET_DURATION = 0.10f;
     }
     
     [self resetToScale:scale WithDuration:RESET_DURATION andCompletion:nil];
+    [self notifyDelegateOfTransform];
 }
 
 #pragma mark - Inertia

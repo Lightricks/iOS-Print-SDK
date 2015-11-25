@@ -97,7 +97,7 @@ static const NSUInteger kTagAlertViewSelectMorePhotos = 99;
 @property (nonatomic, weak) IBOutlet UIButton *buttonNext;
 @property (nonatomic, weak) IBOutlet UIView *noSelectedPhotosView;
 @property (weak, nonatomic) IBOutlet UIView *clearButtonContainerView;
-@property (weak, nonatomic) IBOutlet UIButton *clearButton;
+//@property (weak, nonatomic) IBOutlet UIButton *clearButton;
 @property (strong, nonatomic) UIVisualEffectView *visualEffectView;
 
 @property (assign, nonatomic) CGSize rotationSize;
@@ -195,32 +195,6 @@ static const NSUInteger kTagAlertViewSelectMorePhotos = 99;
     }
     [self onUserSelectedPhotoCountChange];
     
-    if ([[[UIDevice currentDevice] systemVersion] floatValue] >= 8.0){
-        UIVisualEffect *blurEffect;
-        blurEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleExtraLight];
-        
-        self.visualEffectView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
-        UIView *view = self.visualEffectView;
-        [self.clearButtonContainerView insertSubview:view belowSubview:self.clearButton];
-        
-        view.translatesAutoresizingMaskIntoConstraints = NO;
-        NSDictionary *views = NSDictionaryOfVariableBindings(view);
-        NSMutableArray *con = [[NSMutableArray alloc] init];
-        
-        NSArray *visuals = @[@"H:|-0-[view]-0-|",
-                             @"V:|-0-[view]-0-|"];
-        
-        
-        for (NSString *visual in visuals) {
-            [con addObjectsFromArray: [NSLayoutConstraint constraintsWithVisualFormat:visual options:0 metrics:nil views:views]];
-        }
-        
-        [view.superview addConstraints:con];
-        
-    }
-    else{
-        self.clearButtonContainerView.backgroundColor = [UIColor whiteColor];
-    }
 }
 
 - (void)viewDidLayoutSubviews{
@@ -333,12 +307,12 @@ static const NSUInteger kTagAlertViewSelectMorePhotos = 99;
     if ([self.userDisabledPhotos count] > 0){
         self.navigationItem.rightBarButtonItem.title = NSLocalizedString(@"Cancel", @"");
         
-        if ([self.userDisabledPhotos count] == 1){
-            [self.clearButton setTitle:[NSString stringWithFormat:NSLocalizedString(@"Clear %lu Photo", @""), (unsigned long)[self.userDisabledPhotos count]] forState:UIControlStateNormal];
-        }
-        else{
-            [self.clearButton setTitle:[NSString stringWithFormat:NSLocalizedString(@"Clear %lu Photos", @""), (unsigned long)[self.userDisabledPhotos count]] forState:UIControlStateNormal];
-        }
+//        if ([self.userDisabledPhotos count] == 1){
+//            [self.clearButton setTitle:[NSString stringWithFormat:NSLocalizedString(@"Clear %lu Photo", @""), (unsigned long)[self.userDisabledPhotos count]] forState:UIControlStateNormal];
+//        }
+//        else{
+//            [self.clearButton setTitle:[NSString stringWithFormat:NSLocalizedString(@"Clear %lu Photos", @""), (unsigned long)[self.userDisabledPhotos count]] forState:UIControlStateNormal];
+//        }
         [UIView animateKeyframesWithDuration:0.15 delay:0 options:UIViewKeyframeAnimationOptionBeginFromCurrentState | UIViewAnimationOptionCurveLinear animations:^{
             self.clearButtonContainerView.transform = CGAffineTransformMakeTranslation(0, -40);
             self.collectionView.contentInset = UIEdgeInsetsMake(self.collectionView.contentInset.top, self.collectionView.contentInset.left, self.collectionView.contentInset.bottom + 40, self.collectionView.contentInset.left);
@@ -497,7 +471,7 @@ static const NSUInteger kTagAlertViewSelectMorePhotos = 99;
 #endif
 }
 
-- (IBAction)onButtonClearClicked:(UIButton *)sender {
+- (IBAction)onButtonClearClicked:(id)sender {
     NSInteger initialSections = [self numberOfSectionsInCollectionView:self.collectionView];
     
     self.indexPathsToRemoveDict = [[NSMutableDictionary alloc] init];
@@ -822,6 +796,31 @@ static const NSUInteger kTagAlertViewSelectMorePhotos = 99;
     
     imageView.image = nil;
     
+    UIView *disabled = [cell.contentView viewWithTag:42];
+    if (!disabled){
+        disabled = [[UIView alloc] init];
+        disabled.tag = 42;
+        disabled.translatesAutoresizingMaskIntoConstraints = NO;
+        
+        [cell.contentView addSubview:disabled];
+        
+        // Auto autolayout constraints to the cell.
+        NSDictionary *views = NSDictionaryOfVariableBindings(disabled);
+        NSMutableArray *con = [[NSMutableArray alloc] init];
+        
+        NSArray *visuals = @[@"H:|-0-[disabled]-0-|",
+                             @"V:|-0-[disabled]-0-|"];
+        
+        
+        for (NSString *visual in visuals) {
+            [con addObjectsFromArray: [NSLayoutConstraint constraintsWithVisualFormat:visual options:0 metrics:nil views:views]];
+        }
+        
+        [cell.contentView addConstraints:con];
+        
+        disabled.backgroundColor = [UIColor colorWithRed:0.5 green:0.5 blue:0.5 alpha:0.5];
+    }
+    
     UIImageView *checkmark = (UIImageView *) [cell.contentView viewWithTag:41];
     if (!checkmark){
         checkmark = [[UIImageView alloc] init];
@@ -849,31 +848,6 @@ static const NSUInteger kTagAlertViewSelectMorePhotos = 99;
         checkmark.hidden = YES;
     }
     
-    UIView *disabled = [cell.contentView viewWithTag:42];
-    if (!disabled){
-        disabled = [[UIView alloc] init];
-        disabled.tag = 42;
-        disabled.translatesAutoresizingMaskIntoConstraints = NO;
-        
-        [cell.contentView addSubview:disabled];
-        
-        // Auto autolayout constraints to the cell.
-        NSDictionary *views = NSDictionaryOfVariableBindings(disabled);
-        NSMutableArray *con = [[NSMutableArray alloc] init];
-        
-        NSArray *visuals = @[@"H:|-0-[disabled]-0-|",
-                             @"V:|-0-[disabled]-0-|"];
-
-        
-        for (NSString *visual in visuals) {
-            [con addObjectsFromArray: [NSLayoutConstraint constraintsWithVisualFormat:visual options:0 metrics:nil views:views]];
-        }
-        
-        [cell.contentView addConstraints:con];
-        
-        disabled.backgroundColor = [UIColor colorWithRed:0.5 green:0.5 blue:0.5 alpha:0.5];
-    }
-    
     NSInteger skipAtNewLine = [self numberOfCellsPerRow] % 2 == 0  && indexPath.item / [self numberOfCellsPerRow] % 2 == 0 ? 1 : 0;
     imageView.backgroundColor = (indexPath.item + skipAtNewLine) % 2 == 0 ? [UIColor colorWithHexString:@"#e6e9ed"] : [UIColor colorWithHexString:@"#dce0e5"];
     
@@ -888,8 +862,8 @@ static const NSUInteger kTagAlertViewSelectMorePhotos = 99;
                 }
             });
         }];
-        checkmark.hidden = [self.userDisabledPhotos containsObjectIdenticalTo:photo];
-        disabled.hidden = !checkmark.hidden;
+        checkmark.hidden = ![self.userDisabledPhotos containsObjectIdenticalTo:photo];
+        disabled.hidden = checkmark.hidden;
     } else {
         [imageView setImage:nil];
         checkmark.hidden = YES;
@@ -915,11 +889,16 @@ static const NSUInteger kTagAlertViewSelectMorePhotos = 99;
     }
     
     UICollectionViewCell *cell = [collectionView cellForItemAtIndexPath:indexPath];
-    UIView *checkmark = [cell viewWithTag:41];
-    checkmark.hidden = [self.userDisabledPhotos containsObjectIdenticalTo:photo] || photoIndex >= [self.userSelectedPhotos count];
-    
+    UIImageView *checkmark = [cell viewWithTag:41];
     UIView *disabled = [cell viewWithTag:42];
-    disabled.hidden = !checkmark.hidden || photoIndex >= [self.userSelectedPhotos count];
+    if ([self.userDisabledPhotos containsObjectIdenticalTo:photo] && photoIndex < [self.userSelectedPhotos count]){
+        checkmark.hidden = NO;
+        disabled.hidden = NO;
+    }
+    else if (photoIndex < [self.userSelectedPhotos count]){
+        checkmark.hidden = YES;
+        disabled.hidden = YES;
+    }
     
     [self updateTitleBasedOnSelectedPhotoQuanitity];
     
