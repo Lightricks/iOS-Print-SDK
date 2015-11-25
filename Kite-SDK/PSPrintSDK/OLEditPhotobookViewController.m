@@ -212,7 +212,8 @@ UINavigationControllerDelegate>
     if (!self.photobookPhotos){
         self.userSelectedPhotosCopy = [[NSArray alloc] initWithArray:self.userSelectedPhotos copyItems:NO];
         self.photobookPhotos = [[NSMutableArray alloc] initWithCapacity:self.product.quantityToFulfillOrder];
-        for (NSInteger i = 0; i < self.product.quantityToFulfillOrder; i++){
+        for (NSInteger i = 1; i < self.product.quantityToFulfillOrder + 1; i++){
+            self.coverPhoto = self.userSelectedPhotos.firstObject;
             [self.photobookPhotos addObject:i < self.userSelectedPhotos.count ? self.userSelectedPhotos[i] : [NSNull null]];
         }
     }
@@ -357,13 +358,13 @@ UINavigationControllerDelegate>
         imageView = [self findPageForImageIndex:self.longPressImageIndex].imageView;
     }
     
-    UINavigationController *nav = [self.storyboard instantiateViewControllerWithIdentifier:@"CropViewNavigationController"];
-    OLScrollCropViewController *cropVc = (id)nav.topViewController;
+    OLScrollCropViewController *cropVc = [self.storyboard instantiateViewControllerWithIdentifier:@"OLScrollCropViewController"];
     cropVc.delegate = self;
     cropVc.aspectRatio = imageView.frame.size.height / imageView.frame.size.width;
     [cropPhoto getImageWithProgress:NULL completion:^(UIImage *image){
         [cropVc setFullImage:image];
-        [self presentViewController:nav animated:YES completion:NULL];
+        cropVc.edits = cropPhoto.edits;
+        [self presentViewController:cropVc animated:YES completion:NULL];
     }];
 }
 
@@ -663,6 +664,9 @@ UINavigationControllerDelegate>
         photobook.photobookPhotos = self.photobookPhotos;
         if (indexPath.section == kSectionCover){
             photobook.editingPageNumber = nil;
+            
+            photobook.coverPhoto = self.coverPhoto;
+            [photobook loadCoverPhoto];
         }
         else{
             photobook.editingPageNumber = [NSNumber numberWithInteger:indexPath.item * 2];

@@ -175,8 +175,11 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
     for (NSUInteger i = 0; i < duplicatesToFillOrder; ++i) {
         [photoAssets addObject:photoAssets[i % userSelectedAssetCount]];
     }
+    
+#ifdef OL_VERBOSE
     NSLog(@"Adding %lu duplicates", (unsigned long)duplicatesToFillOrder);
-        
+#endif
+    
     NSDictionary *infoDict = [[NSBundle mainBundle] infoDictionary];
     NSString *appVersion = [infoDict objectForKey:@"CFBundleShortVersionString"];
     NSNumber *buildNumber = [infoDict objectForKey:@"CFBundleVersion"];
@@ -340,8 +343,7 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
     
     self.editingPrintPhoto = self.userSelectedPhotos[indexPath.item];
     
-    UINavigationController *nav = [self.storyboard instantiateViewControllerWithIdentifier:@"CropViewNavigationController"];
-    OLScrollCropViewController *cropVc = (id)nav.topViewController;
+    OLScrollCropViewController *cropVc = [self.storyboard instantiateViewControllerWithIdentifier:@"OLScrollCropViewController"];
     cropVc.enableCircleMask = self.product.productTemplate.templateUI == kOLTemplateUICircle;
     cropVc.delegate = self;
     cropVc.aspectRatio = [self productAspectRatio];
@@ -349,7 +351,8 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
         [cropVc.cropView setProgress:progress];
     }completion:^(UIImage *image){
         [cropVc setFullImage:image];
-        [self presentViewController:nav animated:YES completion:NULL];
+        cropVc.edits = self.editingPrintPhoto.edits;
+        [self presentViewController:cropVc animated:YES completion:NULL];
     }];
     
 }
@@ -385,11 +388,6 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
 
 - (NSInteger)numberOfSectionsInCollectionView:(UICollectionView *)collectionView{
     return 1;
-}
-
-- (UICollectionReusableView *)collectionView:(UICollectionView *)collectionView viewForSupplementaryElementOfKind:(NSString *)kind atIndexPath:(NSIndexPath *)indexPath{
-    UICollectionReusableView * cell = [collectionView dequeueReusableSupplementaryViewOfKind:kind withReuseIdentifier:@"reviewHeaderCell" forIndexPath:indexPath];
-    return cell;
 }
 
 - (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath{
@@ -517,7 +515,7 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
 
 - (CGFloat)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout*)collectionViewLayout minimumLineSpacingForSectionAtIndex:(NSInteger)section
 {
-    return 20.0;
+    return 0.0;
 }
 
 #pragma mark - UIAlertViewDelegate methods
@@ -544,9 +542,7 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
 -(void)scrollCropViewController:(OLScrollCropViewController *)cropper didFinishCroppingImage:(UIImage *)croppedImage{
     [self.editingPrintPhoto unloadImage];
     
-    self.editingPrintPhoto.cropImageFrame = [cropper.cropView getFrameRect];
-    self.editingPrintPhoto.cropImageRect = [cropper.cropView getImageRect];
-    self.editingPrintPhoto.cropImageSize = [cropper.cropView croppedImageSize];
+    self.editingPrintPhoto.edits = cropper.edits;
     
     [self.collectionView reloadData];
     [cropper dismissViewControllerAnimated:YES completion:NULL];

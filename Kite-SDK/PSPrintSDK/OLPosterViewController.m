@@ -301,8 +301,7 @@
     
     self.editingPrintPhoto = self.posterPhotos[indexPath.item];
     
-    UINavigationController *nav = [self.storyboard instantiateViewControllerWithIdentifier:@"CropViewNavigationController"];
-    OLScrollCropViewController *cropVc = (id)nav.topViewController;
+    OLScrollCropViewController *cropVc = [self.storyboard instantiateViewControllerWithIdentifier:@"OLScrollCropViewController"];
     cropVc.enableCircleMask = self.product.productTemplate.templateUI == kOLTemplateUICircle;
     cropVc.delegate = self;
     
@@ -310,7 +309,8 @@
     cropVc.aspectRatio = cellSize.height / cellSize.width;
     [self.editingPrintPhoto getImageWithProgress:NULL completion:^(UIImage *image){
         [cropVc setFullImage:image];
-        [self presentViewController:nav animated:YES completion:NULL];
+        cropVc.edits = self.editingPrintPhoto.edits;
+        [self presentViewController:cropVc animated:YES completion:NULL];
     }];
 }
 
@@ -323,9 +323,10 @@
 -(void)scrollCropViewController:(OLScrollCropViewController *)cropper didFinishCroppingImage:(UIImage *)croppedImage{
     [self.editingPrintPhoto unloadImage];
     
-    self.editingPrintPhoto.cropImageFrame = [cropper.cropView getFrameRect];
-    self.editingPrintPhoto.cropImageRect = [cropper.cropView getImageRect];
-    self.editingPrintPhoto.cropImageSize = [cropper.cropView croppedImageSize];
+    self.editingPrintPhoto.edits.cropImageFrame = [cropper.cropView getFrameRect];
+    self.editingPrintPhoto.edits.cropImageRect = [cropper.cropView getImageRect];
+    self.editingPrintPhoto.edits.cropImageSize = [cropper.cropView croppedImageSize];
+    self.editingPrintPhoto.edits.cropTransform = [cropper.cropView.imageView transform];
     
     [self.collectionView reloadData];
     [cropper dismissViewControllerAnimated:YES completion:NULL];
