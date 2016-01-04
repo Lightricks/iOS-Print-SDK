@@ -6,6 +6,12 @@
 //  Copyright (c) 2015 Deon Botha. All rights reserved.
 //
 
+#ifdef COCOAPODS
+#import <MPFlipViewController/MPFlipTransition.h>
+#else
+#import "MPFlipTransition.h"
+#endif
+
 #import "OLPhotobookViewController.h"
 #import "OLProduct.h"
 #import "OLProductTemplate.h"
@@ -36,14 +42,22 @@
 #import <InstagramImagePicker/OLInstagramImage.h>
 #endif
 
-#import "MPFlipTransition.h"
 #import "UIImage+ImageNamedInKiteBundle.h"
+#import "OLKiteABTesting.h"
+#import "OLPaymentViewController.h"
+#import "UIViewController+OLMethods.h"
 
 static const NSUInteger kTagAlertViewSelectMorePhotos = 99;
 static const NSUInteger kTagLeft = 10;
 static const NSUInteger kTagRight = 20;
 static const CGFloat kBookAnimationTime = 0.8;
 static const CGFloat kBookEdgePadding = 38;
+
+@interface OLPaymentViewController (Private)
+
+-(void)saveAndDismissReviewController;
+
+@end
 
 @interface OLKitePrintSDK (InternalUtils)
 
@@ -52,6 +66,19 @@ static const CGFloat kBookEdgePadding = 38;
 + (NSString *) instagramSecret;
 + (NSString *) instagramClientID;
 #endif
+@end
+
+@interface OLKiteViewController ()
+
+@property (strong, nonatomic) OLPrintOrder *printOrder;
+- (void)dismiss;
+
+@end
+
+@interface OLPrintOrder (Private)
+
+- (void)saveOrder;
+
 @end
 
 @interface MPFlipTransition (Private)
@@ -108,10 +135,24 @@ UINavigationControllerDelegate
 @property (weak, nonatomic) OLPopupOptionsImageView *coverImageView;
 @property (assign, nonatomic) NSInteger addNewPhotosAtIndex;
 @property (strong, nonatomic) NSArray *userSelectedPhotosCopy;
+@property (weak, nonatomic) IBOutlet UIButton *ctaButton;
 
 @end
 
 @implementation OLPhotobookViewController
+
+-(id<OLPrintJob>)editingPrintJob{
+    if (_editingPrintJob){
+        return _editingPrintJob;
+    }
+    else if([OLKiteABTesting sharedInstance].launchedWithPrintOrder){
+        OLKiteViewController *kiteVc = [OLKiteUtils kiteVcForViewController:self];
+        self.product.uuid = [kiteVc.printOrder.jobs.firstObject uuid];
+        return [kiteVc.printOrder.jobs firstObject];
+    }
+    
+    return nil;
+}
 
 -(UIDynamicAnimator*) dynamicAnimator{
     if (!_dynamicAnimator) _dynamicAnimator = [[UIDynamicAnimator alloc] initWithReferenceView:self.view];
@@ -162,6 +203,29 @@ UINavigationControllerDelegate
 
 - (void)viewDidLoad{
     [super viewDidLoad];
+    
+    if ([OLKiteABTesting sharedInstance].launchedWithPrintOrder){
+        if ([[OLKiteABTesting sharedInstance].launchWithPrintOrderVariant isEqualToString:@"Review-Overview-Checkout"]){
+            [self.ctaButton setTitle:NSLocalizedString(@"Next", @"") forState:UIControlStateNormal];
+        }
+        
+        if(!self.editingPrintJob){
+            OLKiteViewController *kiteVc = [OLKiteUtils kiteVcForViewController:self];
+            self.editingPrintJob = [kiteVc.printOrder.jobs firstObject];
+            self.product.uuid = self.editingPrintJob.uuid;
+        }
+    }
+    
+    if ([self.presentingViewController respondsToSelector:@selector(viewControllers)]) {
+        UIViewController *paymentVc = [(UINavigationController *)self.presentingViewController viewControllers].lastObject;
+        if ([paymentVc respondsToSelector:@selector(saveAndDismissReviewController)]){
+            [self.ctaButton setTitle:NSLocalizedString(@"Save", @"") forState:UIControlStateNormal];
+            [self.ctaButton removeTarget:self action:@selector(onButtonNextClicked:) forControlEvents:UIControlEventTouchUpInside];
+            [self.ctaButton addTarget:paymentVc action:@selector(saveAndDismissReviewController) forControlEvents:UIControlEventTouchUpInside];
+        }
+    }
+    
+    
     
 #ifndef OL_NO_ANALYTICS
     if (!self.editMode){
@@ -224,9 +288,7 @@ UINavigationControllerDelegate
     [self.pageController.view addGestureRecognizer:panGesture];
     [self.pageController.view addGestureRecognizer:longPressGesture];
     
-    self.title = NSLocalizedString(@"Review", @""); //[NSString stringWithFormat: NSLocalizedString(@"%d / %d", @""), self.userSelectedPhotos.count, self.product.quantityToFulfillOrder];
-    
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"Confirm", @"") style:UIBarButtonItemStylePlain target:self action:@selector(onButtonNextClicked:)];
+    self.title = NSLocalizedString(@"Review", @"");
     
     self.navigationItem.backBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"Back", @"")
                                                                              style:UIBarButtonItemStylePlain
@@ -300,7 +362,11 @@ UINavigationControllerDelegate
     
     [self updatePagesLabel];
     
-    CGFloat yOffset = !self.editMode ? ([[UIApplication sharedApplication] statusBarFrame].size.height + self.navigationController.navigationBar.frame.size.height)/2.0 : -15;
+    if (self.editMode){
+        [self.ctaButton removeFromSuperview];
+    }
+    
+    CGFloat yOffset = !self.editMode ? ([[UIApplication sharedApplication] statusBarFrame].size.height + self.navigationController.navigationBar.frame.size.height-self.ctaButton.frame.size.height)/2.0 : -15;
     if ([[[UIDevice currentDevice] systemVersion] floatValue] < 8){
         yOffset = 22;
     }
@@ -445,6 +511,21 @@ UINavigationControllerDelegate
     }];
 }
 
+- (void)viewWillAppear:(BOOL)animated{
+    [super viewWillAppear:animated];
+    if (!self.editMode){
+        if ([self.presentingViewController respondsToSelector:@selector(viewControllers)]) {
+            UIViewController *presentingVc = [(UINavigationController *)self.presentingViewController viewControllers].lastObject;
+            if (![presentingVc isKindOfClass:[OLPaymentViewController class]]){
+                [self addBasketIconToTopRight];
+            }
+        }
+        else{
+            [self addBasketIconToTopRight];
+        }
+    }
+}
+
 - (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator{
     [super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];
     self.stranded = NO;
@@ -472,7 +553,7 @@ UINavigationControllerDelegate
             }
         }
         
-        CGFloat yOffset = !self.editMode ? ([[UIApplication sharedApplication] statusBarFrame].size.height + self.navigationController.navigationBar.frame.size.height)/2.0 : -15;
+        CGFloat yOffset = !self.editMode ? ([[UIApplication sharedApplication] statusBarFrame].size.height + self.navigationController.navigationBar.frame.size.height-self.ctaButton.frame.size.height)/2.0 : -15;
         
         self.centerYCon = [NSLayoutConstraint constraintWithItem:self.containerView attribute:NSLayoutAttributeCenterY relatedBy:NSLayoutRelationEqual toItem:self.containerView.superview attribute:NSLayoutAttributeCenterY multiplier:1 constant:yOffset];
         [self.containerView.superview addConstraint:self.centerYCon];
@@ -568,7 +649,7 @@ UINavigationControllerDelegate
 
 #pragma mark - Checkout
 
-- (IBAction)onButtonNextClicked:(UIBarButtonItem *)sender {
+- (IBAction)onButtonNextClicked:(UIButton *)sender {
     if (![self shouldGoToCheckout]){
         return;
     }
@@ -603,12 +684,16 @@ UINavigationControllerDelegate
     return YES;
 }
 
-- (void)doCheckout {
+- (void)saveJobWithCompletionHandler:(void(^)())handler{
     NSInteger i = 0;
     NSMutableArray *bookPhotos = [[NSMutableArray alloc] init];
+    NSMutableArray *photobookPhotosClean = [[NSMutableArray alloc] init];
+    [photobookPhotosClean addObjectsFromArray:self.photobookPhotos];
+    [photobookPhotosClean removeObjectIdenticalTo:[NSNull null]];
+    
     for (NSInteger object = 0; object < self.photobookPhotos.count; object++){
         if (self.photobookPhotos[object] == [NSNull null]){
-            [bookPhotos addObject:self.userSelectedPhotos[i % self.userSelectedPhotos.count]];
+            [bookPhotos addObject:photobookPhotosClean[i % photobookPhotosClean.count]];
             i++;
         }
         else{
@@ -627,11 +712,7 @@ UINavigationControllerDelegate
     // URL and the user did not manipulate it in any way.
     NSMutableArray *photoAssets = [[NSMutableArray alloc] init];
     for (OLPrintPhoto *photo in bookPhotos) {
-        if(photo.type == kPrintPhotoAssetTypeOLAsset){
-            [photoAssets addObject:photo.asset];
-        } else {
-            [photoAssets addObject:[OLAsset assetWithDataSource:photo]];
-        }
+        [photoAssets addObject:[OLAsset assetWithDataSource:photo]];
     }
     
     // ensure order is maxed out by adding duplicates as necessary
@@ -647,26 +728,53 @@ UINavigationControllerDelegate
     NSString *appVersion = [infoDict objectForKey:@"CFBundleShortVersionString"];
     NSNumber *buildNumber = [infoDict objectForKey:@"CFBundleVersion"];
     
-    OLPrintOrder *printOrder = [[OLPrintOrder alloc] init];
+    OLPrintOrder *printOrder = [OLKiteUtils kiteVcForViewController:self].printOrder;
     printOrder.userData = @{@"photo_count_iphone": [NSNumber numberWithUnsignedInteger:iphonePhotoCount],
                             @"sdk_version": kOLKiteSDKVersion,
                             @"platform": @"iOS",
-                            @"uid": [[[UIDevice currentDevice] identifierForVendor] UUIDString],
+                            @"uid": [OLAnalytics userDistinctId],
                             @"app_version": [NSString stringWithFormat:@"Version: %@ (%@)", appVersion, buildNumber]
                             };
-    OLPhotobookPrintJob* printJob = [[OLPhotobookPrintJob alloc] initWithTemplateId:self.product.templateId OLAssets:photoAssets];
-    printJob.uuid = [[NSUUID UUID] UUIDString];
-    printJob.frontCover = self.coverPhoto ? [OLAsset assetWithDataSource:self.coverPhoto] : nil;
     
+    
+    OLPhotobookPrintJob *job = [[OLPhotobookPrintJob alloc] initWithTemplateId:self.product.templateId OLAssets:photoAssets];
+    job.frontCover = self.coverPhoto ? [OLAsset assetWithDataSource:self.coverPhoto] : nil;
     for (NSString *option in self.product.selectedOptions.allKeys){
-        [printJob setValue:self.product.selectedOptions[option] forOption:option];
+        [job setValue:self.product.selectedOptions[option] forOption:option];
+    }
+    NSArray *jobs = [NSArray arrayWithArray:printOrder.jobs];
+    for (id<OLPrintJob> existingJob in jobs){
+        if ([existingJob.uuid isEqualToString:self.product.uuid]){
+            if ([existingJob extraCopies] > 0){
+                [existingJob setExtraCopies:[existingJob extraCopies]-1];
+            }
+            else{
+                [printOrder removePrintJob:existingJob];
+            }
+            job.uuid = self.product.uuid;
+        }
+    }
+    self.product.uuid = job.uuid;
+    self.editingPrintJob = job;
+    if ([printOrder.jobs containsObject:self.editingPrintJob]){
+        id<OLPrintJob> existingJob = printOrder.jobs[[printOrder.jobs indexOfObject:self.editingPrintJob]];
+        [existingJob setExtraCopies:[existingJob extraCopies]+1];
+    }
+    else{
+        [printOrder addPrintJob:self.editingPrintJob];
     }
     
-    for (id<OLPrintJob> job in printOrder.jobs){
-        [printOrder removePrintJob:job];
-    }
-    [printOrder addPrintJob:printJob];
+    [printOrder saveOrder];
     
+    if (handler){
+        handler();
+    }
+}
+
+- (void)doCheckout {
+    [self saveJobWithCompletionHandler:NULL];
+    
+    OLPrintOrder *printOrder = [OLKiteUtils kiteVcForViewController:self].printOrder;
     [OLKiteUtils checkoutViewControllerForPrintOrder:printOrder handler:^(id vc){
         [vc safePerformSelector:@selector(setUserEmail:) withObject:[OLKiteUtils userEmail:self]];
         [vc safePerformSelector:@selector(setUserPhone:) withObject:[OLKiteUtils userPhone:self]];
@@ -707,6 +815,8 @@ UINavigationControllerDelegate
         cropVc.aspectRatio = imageView.frame.size.height / imageView.frame.size.width;
         [self.croppingPrintPhoto getImageWithProgress:NULL completion:^(UIImage *image){
             [cropVc setFullImage:image];
+            cropVc.edits = self.croppingPrintPhoto.edits;
+            cropVc.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
             [self presentViewController:cropVc animated:YES completion:NULL];
         }];
     }
@@ -760,6 +870,7 @@ UINavigationControllerDelegate
         [self.croppingPrintPhoto getImageWithProgress:NULL completion:^(UIImage *image){
             [cropVc setFullImage:image];
             cropVc.edits = self.croppingPrintPhoto.edits;
+            cropVc.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
             [self presentViewController:cropVc animated:YES completion:NULL];
         }];
     }
@@ -1345,6 +1456,7 @@ UINavigationControllerDelegate
                     ((CTAssetsPickerController *)picker).assetsFetchOptions = options;
                     assetClass = [PHAsset class];
                     ((CTAssetsPickerController *)picker).delegate = self;
+                    picker.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
                     [self presentViewController:picker animated:YES completion:nil];
                 }
             }];
@@ -1362,6 +1474,7 @@ UINavigationControllerDelegate
 #endif
     
     if (picker){
+        picker.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
         [self presentViewController:picker animated:YES completion:nil];
     }
 }
@@ -1374,6 +1487,7 @@ UINavigationControllerDelegate
     OLFacebookImagePickerController *picker = nil;
     picker = [[OLFacebookImagePickerController alloc] init];
     picker.delegate = self;
+    picker.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
     [self presentViewController:picker animated:YES completion:nil];
 #endif
 }
@@ -1387,6 +1501,7 @@ UINavigationControllerDelegate
     picker = [[OLInstagramImagePickerController alloc] initWithClientId:[OLKitePrintSDK instagramClientID] secret:[OLKitePrintSDK instagramSecret] redirectURI:[OLKitePrintSDK instagramRedirectURI]];
     picker.delegate = self;
     picker.selected = @[];
+    picker.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
     [self presentViewController:picker animated:YES completion:nil];
 #endif
 }
@@ -1470,7 +1585,7 @@ UINavigationControllerDelegate
 #if __IPHONE_OS_VERSION_MIN_REQUIRED < 80000
 - (BOOL)assetsPickerController:(OLAssetsPickerController *)picker isDefaultAssetsGroup:(ALAssetsGroup *)group {
     if ([self.delegate respondsToSelector:@selector(kiteController:isDefaultAssetsGroup:)]) {
-        return [self.delegate kiteController:[self kiteViewController] isDefaultAssetsGroup:group];
+        return [self.delegate kiteController:[OLKiteUtils kiteVcForViewController:self] isDefaultAssetsGroup:group];
     }
     
     return NO;
@@ -1660,16 +1775,6 @@ UINavigationControllerDelegate
 #else
     return NO;
 #endif
-}
-
-- (OLKiteViewController *)kiteViewController {
-    for (UIViewController *vc in self.navigationController.viewControllers) {
-        if ([vc isMemberOfClass:[OLKiteViewController class]]) {
-            return (OLKiteViewController *) vc;
-        }
-    }
-    
-    return nil;
 }
 
 #pragma mark UIActionSheet Delegate (only used on iOS 7)

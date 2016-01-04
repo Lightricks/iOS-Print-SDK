@@ -6,13 +6,20 @@
 //  Copyright (c) 2014 Ocean Labs. All rights reserved.
 //
 
+#ifdef COCOAPODS
+#import <SDWebImage/SDWebImageManager.h>
+#else
+#import "SDWebImageManager.h"
+#endif
+
 #import "OLFrameOrderReviewViewController.h"
 #import "OLPrintPhoto.h"
 #import "OLProduct.h"
 #import "OLAsset+Private.h"
-#import "SDWebImageManager.h"
 #import "UIViewController+TraitCollectionCompatibility.h"
 #import "OLRemoteImageView.h"
+#import "OLKiteUtils.h"
+#import "OLKiteViewController.h"
 
 @interface OLOrderReviewViewController (Private)
 
@@ -61,8 +68,6 @@ CGFloat margin = 2;
     [super viewDidLoad];
     
     self.title = NSLocalizedString(@"Review", @"");
-    
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"Confirm", @"") style:UIBarButtonItemStylePlain target:self action:@selector(onButtonNextClicked:)];
 }
 
 - (void)onTapGestureThumbnailTapped:(UITapGestureRecognizer*)gestureRecognizer {
@@ -89,6 +94,7 @@ CGFloat margin = 2;
     [self.editingPrintPhoto getImageWithProgress:NULL completion:^(UIImage *image){
         [cropVc setFullImage:image];
         cropVc.edits = self.editingPrintPhoto.edits;
+        cropVc.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
         [self presentViewController:cropVc animated:YES completion:NULL];
     }];
 }

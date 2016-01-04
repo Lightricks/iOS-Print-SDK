@@ -16,6 +16,9 @@
 #import "UIViewController+TraitCollectionCompatibility.h"
 #import "UIImageView+FadeIn.h"
 #import "OLKiteABTesting.h"
+#import "OLKiteUtils.h"
+#import "UIViewController+OLMethods.h"
+#import "NSObject+Utils.h"
 
 #define SYSTEM_VERSION_LESS_THAN(v)                 ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
 
@@ -23,6 +26,12 @@
 
 -(void)setCoverImageToImageView:(UIImageView *)imageView;
 -(void)setProductPhotography:(NSUInteger)i toImageView:(UIImageView *)imageView;
+
+@end
+
+@interface OLKiteViewController (Private)
+
+@property (strong, nonatomic) NSMutableArray *userSelectedPhotos;
 
 @end
 
@@ -45,7 +54,7 @@
             if (!product.labelColor || product.productTemplate.templateUI == kOLTemplateUINA){
                 continue;
             }
-            if (product.productTemplate.templateUI == kOLTemplateUIPoster){
+            if (product.productTemplate.templateUI == kOLTemplateUIPoster && !self.subtypeSelection){
                 BOOL sameGridTemplate = NO;
                 for (OLProduct *otherProduct in _products){
                     if (otherProduct.productTemplate.gridCountX == product.productTemplate.gridCountX && otherProduct.productTemplate.gridCountY == product.productTemplate.gridCountY){
@@ -64,11 +73,18 @@
             }
         }
     }
+    if (_products.count == 1 && !self.subtypeSelection && [_products.firstObject productTemplate].templateUI == kOLTemplateUIPoster && self.allPosterProducts.count > 1){
+        _products = nil;
+        self.subtypeSelection = YES;
+        return [self products];
+    }
     return _products;
 }
 
 - (void)viewWillAppear:(BOOL)animated{
     [super viewWillAppear:animated];
+    
+    [self addBasketIconToTopRight];
     
     [self.collectionView.collectionViewLayout invalidateLayout];
 }
@@ -101,6 +117,14 @@
 #endif
 }
 
+- (void)viewDidAppear:(BOOL)animated{
+    [super viewDidAppear:animated];
+    
+    if ([OLKiteABTesting sharedInstance].allowsMultipleRecipients && self.filterProducts){
+        [self addBasketIconToTopRight];
+    }
+}
+
 - (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator {
     [super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];
     self.fromRotation = YES;
@@ -129,11 +153,13 @@
 
 - (UIViewController *)previewingContext:(id<UIViewControllerPreviewing>)previewingContext viewControllerForLocation:(CGPoint)location{
     NSIndexPath *indexPath = [self.collectionView indexPathForItemAtPoint:location];
+    UICollectionViewCell *cell = [self.collectionView cellForItemAtIndexPath:indexPath];
+    [previewingContext setSourceRect:cell.frame];
     return [self viewControllerForItemAtIndexPath:indexPath];
 }
 
 - (void)previewingContext:(id<UIViewControllerPreviewing>)previewingContext commitViewController:(UIViewController *)viewControllerToCommit{
-    [self.navigationController pushViewController:viewControllerToCommit animated:NO];
+    [self.navigationController pushViewController:viewControllerToCommit animated:YES];
 }
 
 - (UIViewController *)viewControllerForItemAtIndexPath:(NSIndexPath *)indexPath{
@@ -142,16 +168,20 @@
     }
     
     OLProduct *product = self.products[indexPath.row];
+    product.uuid = nil;
+    [OLKiteUtils kiteVcForViewController:self].userSelectedPhotos = nil;
+    self.userSelectedPhotos = [OLKiteUtils kiteVcForViewController:self].userSelectedPhotos;
     
     NSString *identifier;
-    if (product.productTemplate.templateUI == kOLTemplateUIPoster){
-        NSInteger x = product.productTemplate.gridCountX;
-        NSInteger y = product.productTemplate.gridCountY;
-        NSString *size = [product.productTemplate.productCode substringFromIndex:product.productTemplate.productCode.length-2];
-        for (OLProduct *otherProduct in self.allPosterProducts){
-            if (![otherProduct.productTemplate.productCode hasSuffix:size] && x == otherProduct.productTemplate.gridCountX && y == otherProduct.productTemplate.gridCountY){
-                identifier = @"sizeSelect";
+    NSMutableArray *posters = [[NSMutableArray alloc] init];
+    if (product.productTemplate.templateUI == kOLTemplateUIPoster && !self.subtypeSelection){
+        for (OLProduct *poster in self.allPosterProducts){
+            if (poster.productTemplate.gridCountX == product.productTemplate.gridCountX && poster.productTemplate.gridCountY == product.productTemplate.gridCountY){
+                [posters addObject:poster];
             }
+        }
+        if (posters.count > 1){
+            identifier = @"OLTypeSelectionViewController";
         }
     }
     if (!identifier){
@@ -160,7 +190,13 @@
     OLProductOverviewViewController *vc = [self.storyboard instantiateViewControllerWithIdentifier:identifier];
     vc.delegate = self.delegate;
     vc.userSelectedPhotos = self.userSelectedPhotos;
-    vc.product = product;
+    [vc safePerformSelector:@selector(setProduct:) withObject:product];
+    
+    if ([vc isKindOfClass:[OLProductTypeSelectionViewController class]]){
+        [(OLProductTypeSelectionViewController *)vc setTemplateClass:self.templateClass];
+        [(OLProductTypeSelectionViewController *)vc setSubtypeSelection:YES];
+        [vc safePerformSelector:@selector(setProducts:) withObject:posters];
+    }
     
     return vc;
 }
@@ -217,7 +253,18 @@
     [product setCoverImageToImageView:imageView];
     
     UILabel *textView = (UILabel *)[cell.contentView viewWithTag:300];
-    textView.text = product.productTemplate.templateType;
+    
+    if (product.productTemplate.templateUI == kOLTemplateUIPoster && !self.subtypeSelection){
+        if (product.productTemplate.gridCountX == 1 && product.productTemplate.gridCountY == 1){
+            textView.text = NSLocalizedString(@"Single Photo Poster", @"");
+        }
+        else{
+            textView.text = [NSString stringWithFormat:@"%ldx%ld Collage", (long)product.productTemplate.gridCountX, (long)product.productTemplate.gridCountY];
+        }
+    }
+    else{
+        textView.text = product.productTemplate.templateType;
+    }
     
     if ([[OLKiteABTesting sharedInstance].productTileStyle isEqualToString:@"Classic"]){
         textView.backgroundColor = [product labelColor];

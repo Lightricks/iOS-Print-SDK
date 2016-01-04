@@ -6,9 +6,14 @@
 //  Copyright (c) 2014 Ocean Labs. All rights reserved.
 //
 
+#ifdef COCOAPODS
+#import <AFNetworking/AFNetworking.h>
+#else
+#import "AFNetworking.h"
+#endif
+
 #import "OLPayPalCard.h"
 #import "OLConstants.h"
-#import "AFNetworking.h"
 
 static NSString *const kKeyNumberMasked = @"co.oceanlabs.paypal.kKeyNumberMasked";
 static NSString *const kKeyCardType = @"co.oceanlabs.paypal.kKeyCardtype";
@@ -204,7 +209,7 @@ static NSString *typeToString(OLPayPalCardType type) {
             total = [NSString stringWithFormat:@"%.0f", [amount doubleValue]]; // no decimal places allowed for YEN
         }
         
-        NSDictionary *paymentJSON = @{@"intent": @"sale",
+        NSDictionary *paymentJSON = @{@"intent": @"authorize",
                                  @"payer": @{
                                          @"payment_method": @"credit_card",
                                          @"funding_instruments": @[fundingInstrument]
@@ -239,7 +244,9 @@ static NSString *typeToString(OLPayPalCardType type) {
                     return;
                 }
                 
-                handler(paymentId, nil);
+                NSString *token = paymentId;
+                token = [token stringByReplacingCharactersInRange:NSMakeRange(0, 3) withString:@"PAUTH"];
+                handler(token, nil);
                 
             } else {
                 id errorMessage = [responseObject objectForKey:@"message"];

@@ -6,8 +6,13 @@
 //  Copyright (c) 2014 Deon Botha. All rights reserved.
 //
 
-#import "OLCreditCardCaptureViewController.h"
+#ifdef COCOAPODS
+#import <SVProgressHUD/SVProgressHUD.h>
+#else
 #import "SVProgressHUD.h"
+#endif
+
+#import "OLCreditCardCaptureViewController.h"
 #import "OLConstants.h"
 #import "OLPayPalCard.h"
 #import "OLJudoPayCard.h"
@@ -320,7 +325,12 @@ UITableViewDataSource, UITextFieldDelegate>
     [self.textFieldCardNumber resignFirstResponder];
     [self.textFieldCVV resignFirstResponder];
     [self.textFieldExpiryDate resignFirstResponder];
-    [self dismissViewControllerAnimated:YES completion:nil];
+    if ([self.delegate respondsToSelector:@selector(creditCardCaptureControllerDismissed:)]){
+        [self.delegate creditCardCaptureControllerDismissed:(OLCreditCardCaptureViewController *) self.navigationController];
+    }
+    else{
+        [self dismissViewControllerAnimated:YES completion:nil];
+    }
 }
 
 //- (void) showCardScanner{

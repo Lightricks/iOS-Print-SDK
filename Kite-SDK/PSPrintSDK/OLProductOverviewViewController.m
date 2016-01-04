@@ -10,7 +10,6 @@
 #import "OLProductOverviewPageContentViewController.h"
 #import "OLProduct.h"
 #import "OLOrderReviewViewController.h"
-#import "OLPosterSizeSelectionViewController.h"
 #import "OLWhiteSquare.h"
 #import "OLKiteViewController.h"
 #import "OLAnalytics.h"
@@ -24,6 +23,8 @@
 #import "OLKiteABTesting.h"
 #import "OLKiteUtils.h"
 #import "OLProductDetailsViewController.h"
+#import "UIViewController+OLMethods.h"
+#import "OLPaymentViewController.h"
 
 @interface OLKiteViewController ()
 
@@ -96,7 +97,7 @@
             vc = vc.parentViewController;
         }
     }
-    if ([(OLKiteViewController *)vc printOrder]){
+    if ([OLKiteABTesting sharedInstance].launchedWithPrintOrder){
         if (![[OLKiteABTesting sharedInstance].launchWithPrintOrderVariant isEqualToString:@"Overview-Review-Checkout"]){
             [self.callToActionButton setTitle: NSLocalizedString(@"Checkout", @"") forState:UIControlStateNormal];
         }
@@ -121,6 +122,34 @@
         [OLAnalytics trackProductDescriptionScreenHitBack:self.product.productTemplate.name hidePrice:[OLKiteABTesting sharedInstance].hidePrice];
     }
 #endif
+}
+
+- (void)viewDidAppear:(BOOL)animated{
+    [super viewDidAppear:animated];
+    
+    if ([self.presentingViewController respondsToSelector:@selector(viewControllers)]) {
+        UIViewController *presentingVc = [(UINavigationController *)self.presentingViewController viewControllers].lastObject;
+        if (![presentingVc isKindOfClass:[OLPaymentViewController class]]){
+            [self addBasketIconToTopRight];
+        }
+    }
+    else{
+        [self addBasketIconToTopRight];
+    }
+}
+
+- (void)viewWillAppear:(BOOL)animated{
+    [super viewWillAppear:animated];
+    
+    if ([self.presentingViewController respondsToSelector:@selector(viewControllers)]) {
+        UIViewController *presentingVc = [(UINavigationController *)self.presentingViewController viewControllers].lastObject;
+        if (![presentingVc isKindOfClass:[OLPaymentViewController class]]){
+            [self addBasketIconToTopRight];
+        }
+    }
+    else{
+        [self addBasketIconToTopRight];
+    }
 }
 
 - (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator{
@@ -246,18 +275,7 @@
 }
 
 - (IBAction)onButtonStartClicked:(id)sender {
-    UIViewController *vc = self.parentViewController;
-    OLPrintOrder *printOrder = nil;
-    while (vc) {
-        if ([vc isKindOfClass:[OLKiteViewController class]]){
-            printOrder = [(OLKiteViewController *)vc printOrder];
-            break;
-        }
-        else{
-            vc = vc.parentViewController;
-        }
-    }
-    if (printOrder){
+    if ([OLKiteABTesting sharedInstance].launchedWithPrintOrder){
         UIViewController *vc;
         if ([[OLKiteABTesting sharedInstance].launchWithPrintOrderVariant isEqualToString:@"Overview-Review-Checkout"]){
             BOOL photoSelection = ![self.delegate respondsToSelector:@selector(kiteControllerShouldAllowUserToAddMorePhotos:)];
@@ -267,7 +285,7 @@
             vc = [self.storyboard instantiateViewControllerWithIdentifier:[OLKiteUtils reviewViewControllerIdentifierForProduct:self.product photoSelectionScreen:photoSelection]];
         }
         else{
-            [OLKiteUtils checkoutViewControllerForPrintOrder:printOrder handler:^(id vc){
+            [OLKiteUtils checkoutViewControllerForPrintOrder:[OLKiteUtils kiteVcForViewController:self].printOrder handler:^(id vc){
                 if ([[OLKiteABTesting sharedInstance].launchWithPrintOrderVariant isEqualToString:@"Checkout"]){
                     [[vc navigationItem] setLeftBarButtonItem:[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCancel target:(OLKiteViewController *)vc action:@selector(dismiss)]];
                 }
@@ -287,7 +305,7 @@
         return;
     }
     
-    vc = [self.storyboard instantiateViewControllerWithIdentifier:[OLKiteUtils reviewViewControllerIdentifierForProduct:self.product photoSelectionScreen:![self.delegate respondsToSelector:@selector(kiteControllerShouldAllowUserToAddMorePhotos:)] || [self.delegate kiteControllerShouldAllowUserToAddMorePhotos:[OLKiteUtils kiteViewControllerInNavStack:self.navigationController.viewControllers]]]];
+    UIViewController *vc = [self.storyboard instantiateViewControllerWithIdentifier:[OLKiteUtils reviewViewControllerIdentifierForProduct:self.product photoSelectionScreen:![self.delegate respondsToSelector:@selector(kiteControllerShouldAllowUserToAddMorePhotos:)] || [self.delegate kiteControllerShouldAllowUserToAddMorePhotos:[OLKiteUtils kiteVcForViewController:self]]]];
     
     [vc safePerformSelector:@selector(setUserSelectedPhotos:) withObject:self.userSelectedPhotos];
     [vc safePerformSelector:@selector(setDelegate:) withObject:self.delegate];

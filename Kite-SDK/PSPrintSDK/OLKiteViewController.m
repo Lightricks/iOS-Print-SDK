@@ -13,7 +13,6 @@
 #import "OLKitePrintSDK.h"
 #import "OLProduct.h"
 #import "OLProductOverviewViewController.h"
-#import "OLPosterSizeSelectionViewController.h"
 #import "OLProductTypeSelectionViewController.h"
 #import "OLKitePrintSDK.h"
 #import "OLAnalytics.h"
@@ -54,11 +53,33 @@ static const NSInteger kTagTemplateSyncFailAlertView = 100;
 
 @end
 
+@interface OLPrintOrder (Private)
+
+- (void)saveOrder;
++ (id)loadOrder;
+
+@end
+
 @implementation OLKiteViewController
 
 - (void)awakeFromNib{
     [super awakeFromNib];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(templateSyncDidFinish:) name:kNotificationTemplateSyncComplete object:nil];
+}
+
+-(OLPrintOrder *) printOrder{
+    if (!_printOrder){
+        _printOrder = [OLPrintOrder loadOrder];
+    }
+    if (!_printOrder){
+        _printOrder = [[OLPrintOrder alloc] init];
+    }
+    return _printOrder;
+}
+
+- (void)clearBasket{
+    self.printOrder = [[OLPrintOrder alloc] init];
+    [self.printOrder saveOrder];
 }
 
 - (UIStatusBarStyle)preferredStatusBarStyle{
@@ -101,6 +122,8 @@ static const NSInteger kTagTemplateSyncFailAlertView = 100;
     NSBundle *currentBundle = [NSBundle bundleForClass:[OLKiteViewController class]];
     if ((self = [[UIStoryboard storyboardWithName:@"OLKiteStoryboard" bundle:currentBundle] instantiateViewControllerWithIdentifier:@"KiteViewController"])) {
         self.printOrder = printOrder;
+        self.assets = [[printOrder.jobs firstObject] assetsForUploading];
+        [OLKiteABTesting sharedInstance].launchedWithPrintOrder = printOrder != nil;
     }
     return self;
 }
@@ -114,7 +137,8 @@ static const NSInteger kTagTemplateSyncFailAlertView = 100;
         self.navigationBar.hidden = NO;
     }
     
-    if (self.printOrder){
+    
+    if ([OLKiteABTesting sharedInstance].launchedWithPrintOrder){
         self.customNavigationItem.title = @"";
     }
     
@@ -131,12 +155,11 @@ static const NSInteger kTagTemplateSyncFailAlertView = 100;
     [self.transitionOperation addDependency:self.templateSyncOperation];
     [self.transitionOperation addDependency:self.remotePlistSyncOperation];
     
-    [OLKiteABTesting sharedInstance].skipHomeScreen = self.printOrder != nil;
     [[OLKiteABTesting sharedInstance] fetchRemotePlistsWithCompletionHandler:^{
         [self.operationQueue addOperation:self.remotePlistSyncOperation];
         
 #ifndef OL_NO_ANALYTICS
-        if (self.printOrder){
+        if ([OLKiteABTesting sharedInstance].launchedWithPrintOrder){
             [OLAnalytics trackKiteViewControllerLoadedWithEntryPoint:[OLKiteABTesting sharedInstance].launchWithPrintOrderVariant];
         }
         else{
@@ -182,7 +205,7 @@ static const NSInteger kTagTemplateSyncFailAlertView = 100;
         UIStoryboard *sb = [UIStoryboard storyboardWithName:@"OLKiteStoryboard" bundle:currentBundle];
         NSString *nextVcNavIdentifier;
         OLProduct *product;
-        if (groups.count == 0 && !([OLProductTemplate templates].count != 0 && welf.printOrder)) {
+        if (groups.count == 0 && !([OLProductTemplate templates].count != 0 && [OLKiteABTesting sharedInstance].launchedWithPrintOrder)) {
             if ([UIAlertController class]){
                 UIAlertController *ac = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"Store Maintenance", @"") message:NSLocalizedString(@"Our store is currently undergoing maintence so no products are available for purchase at this time. Please try again a little later.", @"") preferredStyle:UIAlertControllerStyleAlert];
                 [ac addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"OK", @"") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
@@ -198,7 +221,7 @@ static const NSInteger kTagTemplateSyncFailAlertView = 100;
             }
             return;
         }
-        else if (welf.printOrder){
+        else if ([OLKiteABTesting sharedInstance].launchedWithPrintOrder){
             OLProduct *product = [OLProduct productWithTemplateId:[[welf.printOrder.jobs firstObject] templateId]];
             NSString *identifier;
             if ([[OLKiteABTesting sharedInstance].launchWithPrintOrderVariant hasPrefix:@"Overview-"] && [product isValidProductForUI]){
@@ -229,6 +252,7 @@ static const NSInteger kTagTemplateSyncFailAlertView = 100;
             [vc safePerformSelector:@selector(setUserPhone:) withObject:welf.userPhone];
             [vc safePerformSelector:@selector(setKiteDelegate:) withObject:welf.delegate];
             [vc safePerformSelector:@selector(setProduct:) withObject:product];
+            [vc safePerformSelector:@selector(setUserSelectedPhotos:) withObject:welf.userSelectedPhotos];
             
             [[vc navigationItem] setLeftBarButtonItem:[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCancel target:welf action:@selector(dismiss)]];
             [vc.navigationItem.rightBarButtonItem setTitle:NSLocalizedString(@"Next", @"")];
@@ -271,6 +295,24 @@ static const NSInteger kTagTemplateSyncFailAlertView = 100;
     [self addChildViewController:vc];
     [vc beginAppearanceTransition: YES animated: YES];
     [self.view addSubview:vc.view];
+    
+    UIView *view = vc.view;
+    
+    view.translatesAutoresizingMaskIntoConstraints = NO;
+    NSDictionary *views = NSDictionaryOfVariableBindings(view);
+    NSMutableArray *con = [[NSMutableArray alloc] init];
+    
+    NSArray *visuals = @[@"H:|-0-[view]-0-|",
+                         @"V:|-0-[view]-0-|"];
+    
+    
+    for (NSString *visual in visuals) {
+        [con addObjectsFromArray: [NSLayoutConstraint constraintsWithVisualFormat:visual options:0 metrics:nil views:views]];
+    }
+    
+    [view.superview addConstraints:con];
+
+    
     [UIView animateWithDuration:0.3 animations:^(void){
         vc.view.alpha = 1;
     } completion:^(BOOL b){
@@ -318,6 +360,10 @@ static const NSInteger kTagTemplateSyncFailAlertView = 100;
     }
 }
 
+- (NSArray *)viewControllers{
+    return [(UINavigationController *)self.childViewControllers.firstObject viewControllers];
+}
+
 - (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
     if (alertView.tag == kTagTemplateSyncFailAlertView) {
         if (buttonIndex == 0){
@@ -332,18 +378,7 @@ static const NSInteger kTagTemplateSyncFailAlertView = 100;
 }
 
 + (NSString *)storyboardIdentifierForGroupSelected:(OLProductGroup *)group{
-    OLProduct *product = [group.products firstObject];
-    if (product.productTemplate.templateUI == kOLTemplateUIPoster && group.products.count > 1) {
-        NSInteger x = product.productTemplate.gridCountX;
-        NSInteger y = product.productTemplate.gridCountY;
-        for (OLProduct *otherProduct in group.products){
-            if (x != otherProduct.productTemplate.gridCountX || y != otherProduct.productTemplate.gridCountY){
-                return @"OLTypeSelectionViewController";
-            }
-        }
-        return @"sizeSelect";
-    }
-    else if (group.products.count > 1){
+    if (group.products.count > 1){
         return @"OLTypeSelectionViewController";
     }
     else {

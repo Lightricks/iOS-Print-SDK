@@ -9,7 +9,6 @@
 #import "OLOrderReviewViewController.h"
 #import "OLPrintPhoto.h"
 #import "OLAsset.h"
-#import "OLCheckoutViewController.h"
 #import "OLProductPrintJob.h"
 #import "OLConstants.h"
 #import "OLCheckoutDelegate.h"
@@ -26,14 +25,28 @@
 #import "NSObject+Utils.h"
 #import "OLRemoteImageView.h"
 #import "OLKiteUtils.h"
+#import "OLPaymentViewController.h"
+#import "UIViewController+OLMethods.h"
 
 static const NSUInteger kTagAlertViewSelectMorePhotos = 99;
 static const NSUInteger kTagAlertViewDeletePhoto = 98;
+
+@interface OLPaymentViewController (Private)
+
+-(void)saveAndDismissReviewController;
+
+@end
 
 @interface OLKiteViewController ()
 
 @property (strong, nonatomic) OLPrintOrder *printOrder;
 - (void)dismiss;
+
+@end
+
+@interface OLPrintOrder (Private)
+
+- (void)saveOrder;
 
 @end
 
@@ -43,6 +56,7 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
 @property (strong, nonatomic) UIView *addMorePhotosView;
 @property (strong, nonatomic) UIButton *addMorePhotosButton;
 @property (assign, nonatomic) NSUInteger indexOfPhotoToDelete;
+@property (strong, nonatomic) UIButton *nextButton;
 
 @end
 
@@ -61,16 +75,6 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
 {
     [super viewDidLoad];
     
-    OLKiteViewController *kiteVc = [self kiteVc];
-    if ([kiteVc printOrder] && !self.userSelectedPhotos){
-        self.userSelectedPhotos = [[NSMutableArray alloc] init];
-        for (OLAsset *asset in [[kiteVc.printOrder.jobs firstObject] assetsForUploading]){
-            OLPrintPhoto *printPhoto = [[OLPrintPhoto alloc] init];
-            printPhoto.asset = asset;
-            [self.userSelectedPhotos addObject:printPhoto];
-        }
-    }
-    
 #ifndef OL_NO_ANALYTICS
     [OLAnalytics trackReviewScreenViewed:self.product.productTemplate.name];
 #endif
@@ -81,7 +85,42 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
                                                                              style:UIBarButtonItemStylePlain
                                                                             target:nil
                                                                             action:nil];
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"Confirm", @"") style:UIBarButtonItemStylePlain target:self action:@selector(onButtonNextClicked:)];
+    
+    [self setupCtaButton];
+    
+    self.collectionView.contentInset = UIEdgeInsetsMake(self.collectionView.contentInset.top, self.collectionView.contentInset.left, self.nextButton.frame.size.height, self.collectionView.contentInset.right);
+}
+
+- (void)setupCtaButton{
+    self.nextButton = [[UIButton alloc] init];
+    [self.nextButton.titleLabel setFont:[UIFont systemFontOfSize:17]];
+    [self.nextButton setTitle:NSLocalizedString(@"Add to Basket", @"") forState:UIControlStateNormal];
+    [self.nextButton addTarget:self action:@selector(onButtonNextClicked:) forControlEvents:UIControlEventTouchUpInside];
+    [self.nextButton setBackgroundColor:[UIColor colorWithRed:1.000 green:0.894 blue:0.000 alpha:1.000]];
+    [self.nextButton setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+    self.nextButton.frame = CGRectMake(0, self.view.frame.size.height - 40 - ([[UIApplication sharedApplication] statusBarFrame].size.height + self.navigationController.navigationBar.frame.size.height), self.view.frame.size.width, 40);
+    [self.collectionView addSubview:self.nextButton];
+    
+    if ([OLKiteABTesting sharedInstance].launchedWithPrintOrder){
+        if ([[OLKiteABTesting sharedInstance].launchWithPrintOrderVariant isEqualToString:@"Review-Overview-Checkout"]){
+            [self.nextButton setTitle:NSLocalizedString(@"Next", @"") forState:UIControlStateNormal];
+        }
+        
+        if(!self.editingPrintJob){
+            OLKiteViewController *kiteVc = [OLKiteUtils kiteVcForViewController:self];
+            self.editingPrintJob = [kiteVc.printOrder.jobs firstObject];
+            self.product.uuid = self.editingPrintJob.uuid;
+        }
+    }
+    
+    if ([self.presentingViewController respondsToSelector:@selector(viewControllers)]) {
+        UIViewController *paymentVc = [(UINavigationController *)self.presentingViewController viewControllers].lastObject;
+        if ([paymentVc respondsToSelector:@selector(saveAndDismissReviewController)]){
+            [self.nextButton setTitle:NSLocalizedString(@"Save", @"") forState:UIControlStateNormal];
+            [self.nextButton removeTarget:self action:@selector(onButtonNextClicked:) forControlEvents:UIControlEventTouchUpInside];
+            [self.nextButton addTarget:paymentVc action:@selector(saveAndDismissReviewController) forControlEvents:UIControlEventTouchUpInside];
+        }
+    }
 }
 
 - (void)viewDidDisappear:(BOOL)animated{
@@ -92,6 +131,25 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
         [OLAnalytics trackReviewScreenHitBack:self.product.productTemplate.name numberOfPhotos:self.userSelectedPhotos.count];
     }
 #endif
+}
+
+- (void)viewDidLayoutSubviews{
+    [super viewDidLayoutSubviews];
+    self.nextButton.frame = CGRectMake(0, self.view.frame.size.height - 40 + self.collectionView.contentOffset.y, self.view.frame.size.width, 40);
+}
+
+- (void)viewWillAppear:(BOOL)animated{
+    [super viewWillAppear:animated];
+    
+    if ([self.presentingViewController respondsToSelector:@selector(viewControllers)]) {
+        UIViewController *presentingVc = [(UINavigationController *)self.presentingViewController viewControllers].lastObject;
+        if (![presentingVc isKindOfClass:[OLPaymentViewController class]]){
+            [self addBasketIconToTopRight];
+        }
+    }
+    else{
+        [self addBasketIconToTopRight];
+    }
 }
 
 - (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator {
@@ -111,8 +169,16 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
             UICollectionViewCell *cell = [self.collectionView cellForItemAtIndexPath:indexPath];
             [cell setNeedsDisplay];
         }
+        
+        self.nextButton.frame = CGRectMake(0, self.view.frame.size.height - 40 + self.collectionView.contentOffset.y, self.view.frame.size.width, 40);
     }completion:^(id<UIViewControllerTransitionCoordinator> context){
     }];
+}
+
+- (void)scrollViewDidScroll:(UIScrollView *)scrollView{
+    CGRect headerFrame = self.nextButton.frame;
+    headerFrame.origin.y = self.view.frame.size.height - 40 + scrollView.contentOffset.y ;
+    self.nextButton.frame = headerFrame;
 }
 
 -(NSUInteger) totalNumberOfExtras{
@@ -149,21 +215,7 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
     return YES;
 }
 
-- (OLKiteViewController *)kiteVc{
-    UIViewController *vc = self.parentViewController;
-    while (vc) {
-        if ([vc isKindOfClass:[OLKiteViewController class]]){
-            return (OLKiteViewController *)vc;
-            break;
-        }
-        else{
-            vc = vc.parentViewController;
-        }
-    }
-    return nil;
-}
-
-- (void)doCheckout {
+- (void)saveJobWithCompletionHandler:(void(^)())handler{
     [self preparePhotosForCheckout];
     
     NSUInteger iphonePhotoCount = 0;
@@ -194,37 +246,53 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
     NSString *appVersion = [infoDict objectForKey:@"CFBundleShortVersionString"];
     NSNumber *buildNumber = [infoDict objectForKey:@"CFBundleVersion"];
     
-    OLPrintOrder *printOrder = [[OLPrintOrder alloc] init];
+    OLPrintOrder *printOrder = [OLKiteUtils kiteVcForViewController:self].printOrder;
     printOrder.userData = @{@"photo_count_iphone": [NSNumber numberWithUnsignedInteger:iphonePhotoCount],
                             @"sdk_version": kOLKiteSDKVersion,
                             @"platform": @"iOS",
-                            @"uid": [[[UIDevice currentDevice] identifierForVendor] UUIDString],
+                            @"uid": [OLAnalytics userDistinctId],
                             @"app_version": [NSString stringWithFormat:@"Version: %@ (%@)", appVersion, buildNumber]
                             };
     
-    //Check if we have launched with a Print Order
-    OLKiteViewController *kiteVC = [self kiteVc];
-    if ([kiteVC printOrder]){
-        printOrder = [kiteVC printOrder];
+    OLProductPrintJob *job = [[OLProductPrintJob alloc] initWithTemplateId:self.product.templateId OLAssets:photoAssets];
+    NSArray *jobs = [NSArray arrayWithArray:printOrder.jobs];
+    for (id<OLPrintJob> existingJob in jobs){
+        if ([existingJob.uuid isEqualToString:self.product.uuid]){
+            if ([existingJob extraCopies] > 0){
+                [existingJob setExtraCopies:[existingJob extraCopies]-1];
+            }
+            else{
+                [printOrder removePrintJob:existingJob];
+            }
+            job.uuid = self.product.uuid;
+        }
+    }
+    self.product.uuid = job.uuid;
+    self.editingPrintJob = job;
+    if ([printOrder.jobs containsObject:self.editingPrintJob]){
+        id<OLPrintJob> existingJob = printOrder.jobs[[printOrder.jobs indexOfObject:self.editingPrintJob]];
+        [existingJob setExtraCopies:[existingJob extraCopies]+1];
+		for (NSString *option in self.product.selectedOptions.allKeys){
+        	[job setValue:self.product.selectedOptions[option] forOption:option];
+    	}
+    }
+    else{
+        [printOrder addPrintJob:self.editingPrintJob];
     }
     
-    OLProductPrintJob* printJob = [[OLProductPrintJob alloc] initWithTemplateId:self.product.templateId OLAssets:photoAssets];
-    printJob.uuid = [[NSUUID UUID] UUIDString];
+    [printOrder saveOrder];
     
-    for (NSString *option in self.product.selectedOptions.allKeys){
-        [printJob setValue:self.product.selectedOptions[option] forOption:option];
+    if (handler){
+        handler();
     }
-    
-    for (id<OLPrintJob> job in printOrder.jobs){
-        [printOrder removePrintJob:job];
-    }
-    [printOrder addPrintJob:printJob];
+}
 
-    if ([kiteVC printOrder]){
-        [kiteVC setPrintOrder:printOrder];
-    }
+- (void)doCheckout {
+    [self saveJobWithCompletionHandler:NULL];
     
-    if ([kiteVC printOrder] && [[OLKiteABTesting sharedInstance].launchWithPrintOrderVariant isEqualToString:@"Review-Overview-Checkout"]){
+    OLPrintOrder *printOrder = [OLKiteUtils kiteVcForViewController:self].printOrder;
+    
+    if ([OLKiteABTesting sharedInstance].launchedWithPrintOrder && [[OLKiteABTesting sharedInstance].launchWithPrintOrderVariant isEqualToString:@"Review-Overview-Checkout"]){
         UIViewController *vc = [self.storyboard instantiateViewControllerWithIdentifier:@"OLProductOverviewViewController"];
         [vc safePerformSelector:@selector(setUserEmail:) withObject:[(OLKiteViewController *)vc userEmail]];
         [vc safePerformSelector:@selector(setUserPhone:) withObject:[(OLKiteViewController *)vc userPhone]];
@@ -241,20 +309,6 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
             [self.navigationController pushViewController:vc animated:YES];
         }];
     }
-}
-
-- (OLKiteViewController *)kiteViewController {
-    for (UIViewController *vc in self.navigationController.viewControllers) {
-        if ([vc isMemberOfClass:[OLKiteViewController class]]) {
-            return (OLKiteViewController *) vc;
-        }
-    }
-    
-    return nil;
-}
-
-- (void)onUserSelectedPhotoCountChange {
-    [self updateTitleBasedOnSelectedPhotoQuanitity];
 }
 
 - (void) deletePhotoAtIndex:(NSUInteger)index{
@@ -339,7 +393,7 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
     [self updateTitleBasedOnSelectedPhotoQuanitity];
     
 #ifndef OL_NO_ANALYTICS
-    [OLAnalytics trackReviewScreenIncrementedPhotoQtyForProductName:self.product.productTemplate.name];
+    [OLAnalytics trackReviewScreenDecrementedPhotoQtyForProductName:self.product.productTemplate.name];
 #endif
 }
 
@@ -373,6 +427,7 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
     }completion:^(UIImage *image){
         [cropVc setFullImage:image];
         cropVc.edits = self.editingPrintPhoto.edits;
+        cropVc.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
         [self presentViewController:cropVc animated:YES completion:NULL];
         
 #ifndef OL_NO_ANALYTICS

@@ -31,6 +31,10 @@
 #import <FacebookImagePicker/OLFacebookImage.h>
 #endif
 
+#import "UIViewController+OLMethods.h"
+
+#import "OLPaymentViewController.h"
+
 static const NSInteger kSectionCover = 0;
 static const NSInteger kSectionHelp = 1;
 static const NSInteger kSectionPages = 2;
@@ -72,6 +76,7 @@ UINavigationControllerDelegate>
 @property (strong, nonatomic) OLPrintPhoto *coverPhoto;
 @property (assign, nonatomic) BOOL animating;
 @property (assign, nonatomic) BOOL haveCachedCells;
+@property (strong, nonatomic) UIButton *nextButton;
 
 @property (assign, nonatomic) BOOL rotating;
 
@@ -97,11 +102,6 @@ UINavigationControllerDelegate>
                                                                              style:UIBarButtonItemStylePlain
                                                                             target:nil
                                                                             action:nil];
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
-                                              initWithTitle:NSLocalizedString(@"Next", @"")
-                                              style:UIBarButtonItemStylePlain
-                                              target:self
-                                              action:@selector(onButtonNextClicked)];
     
     UIView *view = self.collectionView;
     view.translatesAutoresizingMaskIntoConstraints = NO;
@@ -120,6 +120,21 @@ UINavigationControllerDelegate>
 
     
     [self updatePhotobookPhotos];
+    
+    [self setupCtaButton];
+    
+    self.collectionView.contentInset = UIEdgeInsetsMake(self.collectionView.contentInset.top, self.collectionView.contentInset.left, self.nextButton.frame.size.height, self.collectionView.contentInset.right);
+}
+
+- (void)setupCtaButton{
+    self.nextButton = [[UIButton alloc] init];
+    [self.nextButton.titleLabel setFont:[UIFont systemFontOfSize:17]];
+    [self.nextButton setTitle:NSLocalizedString(@"Next", @"") forState:UIControlStateNormal];
+    [self.nextButton addTarget:self action:@selector(onButtonNextClicked) forControlEvents:UIControlEventTouchUpInside];
+    [self.nextButton setBackgroundColor:[UIColor colorWithRed:1.000 green:0.894 blue:0.000 alpha:1.000]];
+    [self.nextButton setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+    self.nextButton.frame = CGRectMake(0, self.view.frame.size.height - 40 - ([[UIApplication sharedApplication] statusBarFrame].size.height + self.navigationController.navigationBar.frame.size.height), self.view.frame.size.width, 40);
+    [self.collectionView addSubview:self.nextButton];
 }
 
 - (void)viewDidAppear:(BOOL)animated{
@@ -151,11 +166,20 @@ UINavigationControllerDelegate>
         [OLAnalytics trackPhotoSelectionScreenHitBack:self.product.productTemplate.name];
     }
 #endif
-
 }
 
 - (void)viewWillAppear:(BOOL)animated{
     [super viewWillAppear:animated];
+    
+    if ([self.presentingViewController respondsToSelector:@selector(viewControllers)]) {
+        UIViewController *presentingVc = [(UINavigationController *)self.presentingViewController viewControllers].lastObject;
+        if (![presentingVc isKindOfClass:[OLPaymentViewController class]]){
+            [self addBasketIconToTopRight];
+        }
+    }
+    else{
+        [self addBasketIconToTopRight];
+    }
     
     for (OLPhotobookViewController *photobook in self.childViewControllers){
         if (!photobook.bookClosed){
@@ -165,6 +189,11 @@ UINavigationControllerDelegate>
             }
         }
     }
+}
+
+- (void)viewDidLayoutSubviews{
+    [super viewDidLayoutSubviews];
+    self.nextButton.frame = CGRectMake(0, self.view.frame.size.height - 40 + self.collectionView.contentOffset.y, self.view.frame.size.width, 40);
 }
 
 - (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator{
@@ -188,7 +217,7 @@ UINavigationControllerDelegate>
     }
     
     [coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinator> context){
-       
+        self.nextButton.frame = CGRectMake(0, self.view.frame.size.height - 40 + self.collectionView.contentOffset.y, self.view.frame.size.width, 40);
     }completion:^(id<UIViewControllerTransitionCoordinator> context){
         self.rotating = NO;
         [self.collectionView insertSections:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, 3)]];
@@ -208,6 +237,7 @@ UINavigationControllerDelegate>
     photobook.delegate = self.delegate;
     
     if ([[[UIDevice currentDevice] systemVersion] floatValue] < 8){
+        photobook.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
         [self.navigationController presentViewController:photobook animated:YES completion:NULL];
         return;
     }
@@ -219,8 +249,15 @@ UINavigationControllerDelegate>
     if (!self.photobookPhotos){
         self.userSelectedPhotosCopy = [[NSArray alloc] initWithArray:self.userSelectedPhotos copyItems:NO];
         self.photobookPhotos = [[NSMutableArray alloc] initWithCapacity:self.product.quantityToFulfillOrder];
-        for (NSInteger i = 1; i < self.product.quantityToFulfillOrder + 1; i++){
+        NSInteger start = 0;
+        if (!self.coverPhoto){
             self.coverPhoto = self.userSelectedPhotos.firstObject;
+            start++;
+        }
+        else if (self.coverPhoto == (id)[NSNull null]){
+            self.coverPhoto = nil;
+        }
+        for (NSInteger i = start; i < self.product.quantityToFulfillOrder + start; i++){
             [self.photobookPhotos addObject:i < self.userSelectedPhotos.count ? self.userSelectedPhotos[i] : [NSNull null]];
         }
     }
@@ -329,6 +366,12 @@ UINavigationControllerDelegate>
     }
 }
 
+- (void)scrollViewDidScroll:(UIScrollView *)scrollView{
+    CGRect headerFrame = self.nextButton.frame;
+    headerFrame.origin.y = self.view.frame.size.height - 40 + scrollView.contentOffset.y ;
+    self.nextButton.frame = headerFrame;
+}
+
 #pragma mark - Menu Actions
 
 - (void)deletePage{
@@ -371,6 +414,7 @@ UINavigationControllerDelegate>
     [cropPhoto getImageWithProgress:NULL completion:^(UIImage *image){
         [cropVc setFullImage:image];
         cropVc.edits = cropPhoto.edits;
+        cropVc.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
         [self presentViewController:cropVc animated:YES completion:NULL];
     }];
 }
@@ -850,6 +894,7 @@ UINavigationControllerDelegate>
                     ((CTAssetsPickerController *)picker).assetsFetchOptions = options;
                     assetClass = [PHAsset class];
                     ((CTAssetsPickerController *)picker).delegate = self;
+                    picker.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
                     [self presentViewController:picker animated:YES completion:nil];
                 }
             }];
@@ -867,6 +912,7 @@ UINavigationControllerDelegate>
 #endif
     
     if (picker){
+        picker.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
         [self presentViewController:picker animated:YES completion:nil];
     }
 }
@@ -879,6 +925,7 @@ UINavigationControllerDelegate>
     OLFacebookImagePickerController *picker = nil;
     picker = [[OLFacebookImagePickerController alloc] init];
     picker.delegate = self;
+    picker.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
     [self presentViewController:picker animated:YES completion:nil];
 #endif
 }
@@ -892,6 +939,7 @@ UINavigationControllerDelegate>
     picker = [[OLInstagramImagePickerController alloc] initWithClientId:[OLKitePrintSDK instagramClientID] secret:[OLKitePrintSDK instagramSecret] redirectURI:[OLKitePrintSDK instagramRedirectURI]];
     picker.delegate = self;
     picker.selected = @[];
+    picker.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
     [self presentViewController:picker animated:YES completion:nil];
 #endif
 }

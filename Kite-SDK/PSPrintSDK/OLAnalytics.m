@@ -6,6 +6,12 @@
 //  Copyright (c) 2015 Deon Botha. All rights reserved.
 //
 
+#ifdef COCOAPODS
+#import <AFNetworking/AFNetworking.h>
+#else
+#import "AFNetworking.h"
+#endif
+
 #import "OLAnalytics.h"
 #import "OLPrintOrder.h"
 #import "OLAddress.h"
@@ -13,7 +19,6 @@
 #import "OLProduct.h"
 #import "OLPrintJob.h"
 #import "OLKitePrintSDK.h"
-#import "AFNetworking.h"
 #include <sys/sysctl.h>
 #import "OLKiteABTesting.h"
 #import "UICKeyChainStore.h"
@@ -32,6 +37,12 @@ static NSString *nonNilStr(NSString *str) {
 }
 
 static __weak id<OLKiteDelegate> kiteDelegate;
+
+@interface OLProduct (Private)
+
+- (NSDecimalNumber*) unitCostDecimalNumber;
+
+@end
 
 @implementation OLAnalytics
 
@@ -145,7 +156,7 @@ static __weak id<OLKiteDelegate> kiteDelegate;
         dict[kOLAnalyticsProductName] = template.name;
         dict[kOLAnalyticsNumberOfPhotosInItem] = [NSNumber numberWithInteger:[job quantity]];
         dict[kOLAnalyticsQuantity] = [NSNumber numberWithInteger:[job extraCopies]+1];
-        dict[kOLAnalyticsItemPrice] = nonNilStr([[OLProduct productWithTemplateId:[job templateId]] unitCost]);
+        dict[kOLAnalyticsItemPrice] = [[OLProduct productWithTemplateId:[job templateId]] unitCostDecimalNumber] ? [[OLProduct productWithTemplateId:[job templateId]] unitCostDecimalNumber] : @"";
     }
     return dict;
 }
@@ -172,6 +183,7 @@ static __weak id<OLKiteDelegate> kiteDelegate;
             
             dict[kOLAnalyticsNumberOfPhotosInOrder] = [NSNumber numberWithInteger:order.totalAssetsToUpload];
             dict[kOLAnalyticsPromoCode] = order.promoCode;
+            dict[kOLAnalyticsCurrencyCode] = order.currencyCode;
             [order costWithCompletionHandler:^(OLPrintOrderCost *cost, NSError *error){
                 dict[kOLAnalyticsOrderCost] = [cost totalCostInCurrency:order.currencyCode];
                 dict[kOLAnalyticsOrderShippingCost] = [cost shippingCostInCurrency:order.currencyCode];
@@ -310,27 +322,27 @@ static __weak id<OLKiteDelegate> kiteDelegate;
 #pragma mark Analytics overload - Don't send these to Mixpanel.
 
 + (void)trackProductTypeSelectionScreenHitBackTemplateClass:(NSString *)templateClassString{
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:@"Product Type Selection Screen Hit Back"];
-    //    [dict[@"properties"] setObject:nonNilStr(templateClassString) forKey:@"Template Class"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:@"Product Type Selection Screen Hit Back"];
+//    [dict[@"properties"] setObject:nonNilStr(templateClassString) forKey:@"Template Class"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:@"Product Category Screen Hit Back" job:nil printOrder:nil extraInfo:@{kOLAnalyticsProductCategory : templateClassString}];
 }
 
 + (void)trackKiteDismissed{
     NSString *eventName = @"Kite Dismissed";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:nil printOrder:nil extraInfo:nil];
 }
 
 + (void)trackPhotoProviderPicked:(NSString *)provider forProductName:(NSString *)productName{
     NSString *eventName = @"Photo Provider Selected";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
-    //    [dict[@"properties"] setObject:nonNilStr(provider) forKey:@"Photo Provider"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
+//    [dict[@"properties"] setObject:nonNilStr(provider) forKey:@"Photo Provider"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:nil printOrder:nil extraInfo:@{kOLAnalyticsProductName : productName, kOLAnalyticsPhotoSource : nonNilStr(provider)}];
 }
@@ -369,100 +381,100 @@ static __weak id<OLKiteDelegate> kiteDelegate;
 
 + (void)trackPaymentScreenHitItemQtyDownForItem:(id<OLPrintJob>)item inOrder:(OLPrintOrder *)printOrder applePayIsAvailable:(NSString *)applePayIsAvailable{
     NSString *eventName = @"Payment Screen Item Quantity Down";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr([OLProductTemplate templateWithId:[item templateId]].name) forKey:@"Product Name"];
-    //    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item quantity]] forKey:@"Number of Photos"];
-    //    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item extraCopies]] forKey:@"Extra Copies"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr([OLProductTemplate templateWithId:[item templateId]].name) forKey:@"Product Name"];
+//    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item quantity]] forKey:@"Number of Photos"];
+//    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item extraCopies]] forKey:@"Extra Copies"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:item printOrder:printOrder extraInfo:nil];
 }
 
 + (void)trackReviewScreenHitBack:(NSString *)productName numberOfPhotos:(NSInteger)numberOfPhotos{
     NSString *eventName = @"Review Screen Hit Back";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
-    //    [dict[@"properties"] setObject:[NSNumber numberWithInteger:numberOfPhotos] forKey:@"Number of Photos"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
+//    [dict[@"properties"] setObject:[NSNumber numberWithInteger:numberOfPhotos] forKey:@"Number of Photos"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:nil printOrder:nil extraInfo:@{kOLAnalyticsProductName : productName, kOLAnalyticsNumberOfPhotos : [NSNumber numberWithInteger:numberOfPhotos]}];
 }
 
 + (void)trackPaymentScreenHitItemQtyUpForItem:(id<OLPrintJob>)item inOrder:(OLPrintOrder *)printOrder applePayIsAvailable:(NSString *)applePayIsAvailable{
     NSString *eventName = @"Payment Screen Item Quantity Up";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr([OLProductTemplate templateWithId:[item templateId]].name) forKey:@"Product Name"];
-    //    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item quantity]] forKey:@"Number of Photos"];
-    //    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item extraCopies]] forKey:@"Extra Copies"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr([OLProductTemplate templateWithId:[item templateId]].name) forKey:@"Product Name"];
+//    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item quantity]] forKey:@"Number of Photos"];
+//    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item extraCopies]] forKey:@"Extra Copies"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:item printOrder:printOrder extraInfo:nil];
 }
 
 + (void)trackReviewScreenDidCropPhotoForProductName:(NSString *)productName{
     NSString *eventName = @"Review Screen Did Crop Photo";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:nil printOrder:nil extraInfo:@{kOLAnalyticsProductName : productName}];
 }
 
 + (void)trackReviewScreenDecrementedPhotoQtyForProductName:(NSString *)productName{
     NSString *eventName = @"Review Screen Decremented Photo Quantity";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:nil printOrder:nil extraInfo:@{kOLAnalyticsProductName : productName}];
 }
 
 + (void)trackReviewScreenEnteredCropScreenForProductName:(NSString *)productName{
     NSString *eventName = @"Review Screen Did Enter Crop Screen";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:nil printOrder:nil extraInfo:@{kOLAnalyticsProductName : productName}];
 }
 
 + (void)trackPhotoSelectionScreenNumberOfPhotosRemoved:(NSUInteger)number forProductName:(NSString *)productName{
     NSString *eventName = @"Photo Selection Screen Removed Photos";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
-    //    [dict[@"properties"] setObject:[NSNumber numberWithInteger:number] forKey:@"Number of Photos Removed"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
+//    [dict[@"properties"] setObject:[NSNumber numberWithInteger:number] forKey:@"Number of Photos Removed"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:nil printOrder:nil extraInfo:@{kOLAnalyticsProductName : productName, kOLAnalyticsNumberOfPhotos : [NSNumber numberWithInteger:number]}];
 }
 
 + (void)trackPaymentScreenDidDeleteItem:(id<OLPrintJob>)item inOrder:(OLPrintOrder *)printOrder applePayIsAvailable:(NSString *)applePayIsAvailable{
     NSString *eventName = @"Payment Screen Delete Item";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr([OLProductTemplate templateWithId:[item templateId]].name) forKey:@"Product Name"];
-    //    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item quantity]] forKey:@"Number of Photos"];
-    //    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item extraCopies]] forKey:@"Extra Copies"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr([OLProductTemplate templateWithId:[item templateId]].name) forKey:@"Product Name"];
+//    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item quantity]] forKey:@"Number of Photos"];
+//    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item extraCopies]] forKey:@"Extra Copies"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:item printOrder:printOrder extraInfo:nil];
 }
 
 + (void)trackPaymentScreenHitEditItemDone:(id<OLPrintJob>)item inOrder:(OLPrintOrder *)printOrder applePayIsAvailable:(NSString *)applePayIsAvailable{
     NSString *eventName = @"Payment Screen Did Edit Item";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr([OLProductTemplate templateWithId:[item templateId]].name) forKey:@"Product Name"];
-    //    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item quantity]] forKey:@"Number of Photos"];
-    //    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item extraCopies]] forKey:@"Extra Copies"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr([OLProductTemplate templateWithId:[item templateId]].name) forKey:@"Product Name"];
+//    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item quantity]] forKey:@"Number of Photos"];
+//    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item extraCopies]] forKey:@"Extra Copies"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:item printOrder:printOrder extraInfo:nil];
 }
 
 + (void)trackProductDetailsViewOpened:(NSString *)productName hidePrice:(BOOL)hidePrice{
     NSString *eventName = @"Product Details Opened";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:nil printOrder:nil extraInfo:@{kOLAnalyticsProductName : productName}];
 }
@@ -478,8 +490,8 @@ static __weak id<OLKiteDelegate> kiteDelegate;
 
 + (void)trackPaymentScreenHitBackForOrder:(OLPrintOrder *)printOrder applePayIsAvailable:(NSString *)applePayIsAvailable{
     NSString *eventName = @"Payment Screen Hit Back";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:nil printOrder:printOrder extraInfo:nil];
 }
@@ -489,22 +501,42 @@ static __weak id<OLKiteDelegate> kiteDelegate;
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:nil printOrder:printOrder extraInfo:nil];
 }
 
++ (void)trackPaymentScreenSuccessfullyAppliedPromoCode:(NSString *)code forOrder:(OLPrintOrder *)order{
+    [OLAnalytics reportAnalyticsEventToDelegate:@"Payment Screen Successfully Applied Promo Code" job:nil printOrder:order extraInfo:@{kOLAnalyticsPromoCode : nonNilStr(code)}];
+}
+
++ (void)trackPaymentScreenUnsuccessfullyAppliedPromoCode:(NSString *)code withError:(NSError *)error forOrder:(OLPrintOrder *)order{
+    [OLAnalytics reportAnalyticsEventToDelegate:@"Payment Screen Promo Code Failed" job:nil printOrder:order extraInfo:@{kOLAnalyticsPromoCode : nonNilStr(code), kOLAnalyticsError : error ? error : @""}];
+}
+
++ (void)trackPaymentScreenDidTapOnPromoCodeBoxforOrder:(OLPrintOrder *)order{
+    [OLAnalytics reportAnalyticsEventToDelegate:@"Payment Screen Did Tap on Promo Code Box" job:nil printOrder:order extraInfo:nil];
+}
+
++ (void)trackPaymentScreenPaymentMethodHit:(NSString *)method forOrder:(OLPrintOrder *)order applePayIsAvailable:(NSString *)applePayIsAvailable{
+    [OLAnalytics reportAnalyticsEventToDelegate:@"Payment Screen Payment Method Tapped" job:nil printOrder:order extraInfo:@{kOLAnalyticsPaymentMethod : method}];
+}
+
++ (void)trackPaymentScreenPaymentMethodDidCancel:(NSString *)method forOrder:(OLPrintOrder *)order applePayIsAvailable:(NSString *)applePayIsAvailable{
+    [OLAnalytics reportAnalyticsEventToDelegate:@"Payment Screen Payment Method Did Cancel" job:nil printOrder:order extraInfo:@{kOLAnalyticsPaymentMethod : method}];
+}
+
 + (void)trackReviewScreenIncrementedPhotoQtyForProductName:(NSString *)productName{
     NSString *eventName = @"Review Screen Incremented Photo Quantity";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:nil printOrder:nil extraInfo:@{kOLAnalyticsProductName : productName}];
 }
 
 + (void)trackPaymentScreenHitEditItem:(id<OLPrintJob>)item inOrder:(OLPrintOrder *)printOrder applePayIsAvailable:(NSString *)applePayIsAvailable{
     NSString *eventName = @"Payment Screen Hit Edit Item";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr([OLProductTemplate templateWithId:[item templateId]].name) forKey:@"Product Name"];
-    //    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item quantity]] forKey:@"Number of Photos"];
-    //    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item extraCopies]] forKey:@"Extra Copies"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr([OLProductTemplate templateWithId:[item templateId]].name) forKey:@"Product Name"];
+//    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item quantity]] forKey:@"Number of Photos"];
+//    [dict[@"properties"] setObject:[NSNumber numberWithInteger:[item extraCopies]] forKey:@"Extra Copies"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:item printOrder:printOrder extraInfo:nil];
 }
@@ -523,37 +555,37 @@ static __weak id<OLKiteDelegate> kiteDelegate;
 
 + (void)trackReviewScreenDeletedPhotoForProductName:(NSString *)productName{
     NSString *eventName = @"Review Screen Deleted Photo";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:nil printOrder:nil extraInfo:@{kOLAnalyticsProductName : productName}];
 }
 
 + (void)trackPhotoProvider:(NSString *)provider numberOfPhotosAdded:(NSInteger)number forProductName:(NSString *)productName{
     NSString *eventName = @"Photo Provider Added Photos";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
-    //    [dict[@"properties"] setObject:nonNilStr(provider) forKey:@"Photo Provider"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
+//    [dict[@"properties"] setObject:nonNilStr(provider) forKey:@"Photo Provider"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:nil printOrder:nil extraInfo:@{kOLAnalyticsProductName : productName, kOLAnalyticsNumberOfPhotos : [NSNumber numberWithInteger:number], kOLAnalyticsPhotoSource : nonNilStr(provider)}];
 }
 
 + (void)trackProductDescriptionScreenHitBack:(NSString *)productName hidePrice:(BOOL)hidePrice{
     NSString *eventName = @"Product Description Screen Hit Back";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:nil printOrder:nil extraInfo:@{kOLAnalyticsProductName : productName}];
 }
 
 + (void)trackPhotoSelectionScreenHitBack:(NSString *)productName{
     NSString *eventName = @"Photo Selection Screen Hit Back";
-    //    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
-    //    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
-    //    [OLAnalytics sendToMixPanelWithDictionary:dict];
+//    NSDictionary *dict = [OLAnalytics defaultDictionaryForEventName:eventName];
+//    [dict[@"properties"] setObject:nonNilStr(productName) forKey:@"Product Name"];
+//    [OLAnalytics sendToMixPanelWithDictionary:dict];
     
     [OLAnalytics reportAnalyticsEventToDelegate:eventName job:nil printOrder:nil extraInfo:@{kOLAnalyticsProductName : productName}];
 }
@@ -623,7 +655,7 @@ static __weak id<OLKiteDelegate> kiteDelegate;
         id name = [OLProduct productWithTemplateId:printJob.templateId].productTemplate.name;
         if (name){
             [productNames addObject:name];
-        }
+         }
     }
     return productNames;
 }

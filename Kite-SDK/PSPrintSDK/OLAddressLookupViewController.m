@@ -12,7 +12,13 @@
 #import "OLCountryPickerController.h"
 #import "OLAddressEditViewController.h"
 #import "OLConstants.h"
+#ifdef COCOAPODS
+#import <SVProgressHUD/SVProgressHUD.h>
+#else
 #import "SVProgressHUD.h"
+#endif
+#import "OLKiteViewController.h"
+#import "OLKiteUtils.h"
 
 //static const NSUInteger kMaxInFlightRequests = 5;
 
@@ -101,10 +107,11 @@
 }
 
 - (void)onButtonChangeCountryClicked {
-        OLCountryPickerController *controller = [[OLCountryPickerController alloc] init];
-        controller.delegate = self;
-        controller.selected = @[self.country];
-        [self presentViewController:controller animated:YES completion:nil];
+    OLCountryPickerController *controller = [[OLCountryPickerController alloc] init];
+    controller.delegate = self;
+    controller.selected = @[self.country];
+    controller.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
+    [self presentViewController:controller animated:YES completion:nil];
 }
 
 - (void)performQueuedAddressLookup {

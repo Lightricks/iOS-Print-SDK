@@ -131,10 +131,8 @@ static id stringOrEmptyString(NSString *str) {
 - (NSDictionary *)jsonRepresentation {
     NSMutableArray *assets = [[NSMutableArray alloc] init];
     
-    for (NSInteger i = -1; i < self.extraCopies; i++) {
-        for (OLAsset *asset in self.assets) {
-            [assets addObject:[NSString stringWithFormat:@"%lld", asset.assetId]];
-        }
+    for (OLAsset *asset in self.assets) {
+        [assets addObject:[NSString stringWithFormat:@"%lld", asset.assetId]];
     }
     
     NSMutableDictionary *json = [[NSMutableDictionary alloc] init];
@@ -196,7 +194,7 @@ static id stringOrEmptyString(NSString *str) {
     }
     OLProductPrintJob* printJob = (OLProductPrintJob*)object;
     
-    return [self.templateId isEqual:printJob.templateId] && [self.assets isEqual:printJob.assets] && [self.options isEqualToDictionary:printJob.options];
+    return [self.templateId isEqual:printJob.templateId] && [self.assets isEqualToArray:printJob.assets] && [self.options isEqualToDictionary:printJob.options] && ((!self.address && !printJob.address) || [self.address isEqual:printJob.address]);
 }
 
 

@@ -6,28 +6,33 @@
 //  Copyright (c) 2013 Ocean Labs. All rights reserved.
 //
 
+#ifdef COCOAPODS
+#import <SDWebImage/SDWebImageManager.h>
+#import <TSMarkdownParser/TSMarkdownParser.h>
+#else
+#import "SDWebImageManager.h"
+#import "TSMarkdownParser.h"
+#endif
+
+#import "NSObject+Utils.h"
+#import "OLAnalytics.h"
+#import "OLCustomNavigationController.h"
+#import "OLInfoPageViewController.h"
+#import "OLKiteABTesting.h"
+#import "OLKitePrintSDK.h"
+#import "OLKiteUtils.h"
+#import "OLKiteViewController.h"
+#import "OLProduct.h"
+#import "OLProductGroup.h"
 #import "OLProductHomeViewController.h"
 #import "OLProductOverviewViewController.h"
-#import "OLProductTypeSelectionViewController.h"
 #import "OLProductTemplate.h"
-#import "OLProduct.h"
-#import "OLKiteViewController.h"
-#import "OLKitePrintSDK.h"
-#import "OLPosterSizeSelectionViewController.h"
-#import "OLAnalytics.h"
-#import "OLProductGroup.h"
-#import "NSObject+Utils.h"
-#import "OLCustomNavigationController.h"
-#import "UIViewController+TraitCollectionCompatibility.h"
-#import "UIImageView+FadeIn.h"
-#import "OLKiteABTesting.h"
+#import "OLProductTypeSelectionViewController.h"
 #import "UIImage+ColorAtPixel.h"
-#import "OLInfoPageViewController.h"
-#import "SDWebImageManager.h"
-#import <MessageUI/MessageUI.h>
-#import <MessageUI/MFMailComposeViewController.h>
-#import "TSMarkdownParser.h"
 #import "UIImage+ImageNamedInKiteBundle.h"
+#import "UIImageView+FadeIn.h"
+#import "UIViewController+OLMethods.h"
+#import "UIViewController+TraitCollectionCompatibility.h"
 
 #define SYSTEM_VERSION_LESS_THAN(v)                 ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
 
@@ -42,10 +47,13 @@
 @interface OLKiteViewController (Private)
 
 + (NSString *)storyboardIdentifierForGroupSelected:(OLProductGroup *)group;
+@property (strong, nonatomic) OLPrintOrder *printOrder;
+@property (strong, nonatomic) NSMutableArray *userSelectedPhotos;
+- (void)dismiss;
 
 @end
 
-@interface OLProductHomeViewController () <MFMailComposeViewControllerDelegate, UICollectionViewDelegateFlowLayout, UIViewControllerPreviewingDelegate>
+@interface OLProductHomeViewController () <UICollectionViewDelegateFlowLayout, UIViewControllerPreviewingDelegate>
 @property (nonatomic, strong) NSArray *productGroups;
 @property (nonatomic, strong) UIImageView *topSurpriseImageView;
 @property (assign, nonatomic) BOOL fromRotation;
@@ -91,11 +99,6 @@
     }
     else if (!url && [self isMemberOfClass:[OLProductHomeViewController class]]){
         self.title = NSLocalizedString(@"Print Shop", @"");
-    }
-    
-    NSString *supportEmail = [OLKiteABTesting sharedInstance].supportEmail;
-    if (supportEmail && ![supportEmail isEqualToString:@""] && [self isMemberOfClass:[OLProductHomeViewController class]]){
-        self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamedInKiteBundle:@"support"] style:UIBarButtonItemStyleDone target:self action:@selector(emailButtonPushed:)];
     }
     
     if ([UITraitCollection class] && [self.traitCollection respondsToSelector:@selector(forceTouchCapability)] && self.traitCollection.forceTouchCapability == UIForceTouchCapabilityAvailable){
@@ -215,27 +218,6 @@
         }
         [self setupBannerLabel:label];
     }
-}
-
-#pragma mark - MFMailComposeViewControllerDelegate methods
-- (IBAction)emailButtonPushed:(id)sender {
-    
-    if([MFMailComposeViewController canSendMail]) {
-        MFMailComposeViewController *mailCont = [[MFMailComposeViewController alloc] init];
-        mailCont.mailComposeDelegate = self;
-        [mailCont setSubject:@""];
-        [mailCont setToRecipients:@[[OLKiteABTesting sharedInstance].supportEmail]];
-        [mailCont setMessageBody:@"" isHTML:NO];
-        [self presentViewController:mailCont animated:YES completion:nil];
-    } else {
-        UIAlertView *av = [[UIAlertView alloc] initWithTitle:NSLocalizedString(@"Support", @"") message:[NSString stringWithFormat:NSLocalizedString(@"Please email %@ for support & customer service enquiries.", @""), [OLKiteABTesting sharedInstance].supportEmail] delegate:nil cancelButtonTitle:NSLocalizedString(@"OK", @"") otherButtonTitles:nil];
-        [av show];
-    }
-}
-
-- (void)mailComposeController:(MFMailComposeViewController*)controller didFinishWithResult:(MFMailComposeResult)result error:(NSError*)error {
-    //handle any error
-    [controller dismissViewControllerAnimated:YES completion:nil];
 }
 
 - (NSString *)promoBannerParaText{
@@ -364,10 +346,16 @@
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    
+    [self addBasketIconToTopRight];
 }
 
 - (void)viewDidAppear:(BOOL)animated{
     [super viewDidAppear:animated];
+    
+    if ([OLKiteABTesting sharedInstance].allowsMultipleRecipients){
+        [self addBasketIconToTopRight];
+    }
     
     NSURL *url = [NSURL URLWithString:[OLKiteABTesting sharedInstance].headerLogoURL];
     if (url && ![[SDWebImageManager sharedManager] cachedImageExistsForURL:url] && [self isMemberOfClass:[OLProductHomeViewController class]]){
@@ -435,7 +423,7 @@
 #pragma mark - UICollectionViewDelegate Methods
 
 - (CGSize) collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout sizeForItemAtIndexPath:(NSIndexPath *)indexPath{
-    CGSize size = self.view.bounds.size;
+    CGSize size = self.view.frame.size;
     if (indexPath.section == 0 && ![[OLKiteABTesting sharedInstance].qualityBannerType isEqualToString:@"None"]){
         CGFloat height = 110;
         if ([self isHorizontalSizeClassCompact] && size.height > size.width){
@@ -491,11 +479,13 @@
 
 - (UIViewController *)previewingContext:(id<UIViewControllerPreviewing>)previewingContext viewControllerForLocation:(CGPoint)location{
     NSIndexPath *indexPath = [self.collectionView indexPathForItemAtPoint:location];
+    UICollectionViewCell *cell = [self.collectionView cellForItemAtIndexPath:indexPath];
+    [previewingContext setSourceRect:cell.frame];
     return [self viewControllerForItemAtIndexPath:indexPath];
 }
 
 - (void)previewingContext:(id<UIViewControllerPreviewing>)previewingContext commitViewController:(UIViewController *)viewControllerToCommit{
-    [self.navigationController pushViewController:viewControllerToCommit animated:NO];
+    [self.navigationController pushViewController:viewControllerToCommit animated:YES];
 }
 
 - (UIViewController *)viewControllerForItemAtIndexPath:(NSIndexPath *)indexPath{
@@ -511,6 +501,10 @@
     
     OLProductGroup *group = self.productGroups[indexPath.row];
     OLProduct *product = [group.products firstObject];
+    product.uuid = nil;
+    [OLKiteUtils kiteVcForViewController:self].userSelectedPhotos = nil;
+    self.userSelectedPhotos = [OLKiteUtils kiteVcForViewController:self].userSelectedPhotos;
+    
     NSString *identifier = [OLKiteViewController storyboardIdentifierForGroupSelected:group];
     
     id vc = [self.storyboard instantiateViewControllerWithIdentifier:identifier];

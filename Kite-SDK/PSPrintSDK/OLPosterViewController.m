@@ -6,6 +6,12 @@
 //  Copyright (c) 2015 Deon Botha. All rights reserved.
 //
 
+#ifdef COCOAPODS
+#import <SDWebImage/SDWebImageManager.h>
+#else
+#import "SDWebImageManager.h"
+#endif
+
 #import "OLPosterViewController.h"
 #import "OLProduct.h"
 #import "OLAnalytics.h"
@@ -14,13 +20,18 @@
 #import "OLScrollCropViewController.h"
 #import "OLKiteViewController.h"
 #import "NSObject+Utils.h"
-#import "SDWebImageManager.h"
 #import "OLAsset+Private.h"
 #import "OLAnalytics.h"
 #import "OLKitePrintSDK.h"
 #import "OLKiteABTesting.h"
 #import "OLRemoteImageView.h"
 #import "OLKiteUtils.h"
+
+@interface OLPrintOrder (Private)
+
+- (void)saveOrder;
+
+@end
 
 @interface OLPosterViewController () <UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UICollectionViewDelegate, LXReorderableCollectionViewDataSource, OLScrollCropViewControllerDelegate>
 
@@ -61,11 +72,10 @@
         }
     }
     
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
-                                              initWithTitle:@"Next"
-                                              style:UIBarButtonItemStylePlain
-                                              target:self
-                                              action:@selector(doCheckout)];
+    self.navigationItem.backBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"Back", @"")
+                                                                             style:UIBarButtonItemStylePlain
+                                                                            target:nil
+                                                                            action:nil];
     [self setTitle:NSLocalizedString(@"Edit Poster", @"")];
     
     self.numberOfColumns = self.product.productTemplate.gridCountX;
@@ -198,7 +208,7 @@
     }
 }
 
-- (void)doCheckout{
+- (void)saveJobWithCompletionHandler:(void (^)())handler{
     NSUInteger iphonePhotoCount = 0;
     for (OLPrintPhoto *photo in self.posterPhotos) {
         if (photo.type == kPrintPhotoAssetTypeALAsset || photo.type == kPrintPhotoAssetTypePHAsset) ++iphonePhotoCount;
@@ -208,12 +218,7 @@
     // URL and the user did not manipulate it in any way.
     NSMutableArray *photoAssets = [[NSMutableArray alloc] init];
     for (OLPrintPhoto *photo in self.posterPhotos) {
-        if(photo.type == kPrintPhotoAssetTypeOLAsset){
-            [photoAssets addObject:photo.asset];
-        }
-        else {
-            [photoAssets addObject:[OLAsset assetWithDataSource:photo]];
-        }
+        [photoAssets addObject:[OLAsset assetWithDataSource:photo]];
     }
     [self changeOrderOfPhotosInArray:photoAssets];
     
@@ -222,37 +227,52 @@
     NSString *appVersion = [infoDict objectForKey:@"CFBundleShortVersionString"];
     NSNumber *buildNumber = [infoDict objectForKey:@"CFBundleVersion"];
     
-    OLPrintOrder *printOrder = [[OLPrintOrder alloc] init];
+    OLPrintOrder *printOrder = [OLKiteUtils kiteVcForViewController:self].printOrder;
     printOrder.userData = @{@"photo_count_iphone": [NSNumber numberWithUnsignedInteger:iphonePhotoCount],
                             @"sdk_version": kOLKiteSDKVersion,
                             @"platform": @"iOS",
-                            @"uid": [[[UIDevice currentDevice] identifierForVendor] UUIDString],
+                            @"uid": [OLAnalytics userDistinctId],
                             @"app_version": [NSString stringWithFormat:@"Version: %@ (%@)", appVersion, buildNumber]
                             };
     
-    //Check if we have launched with a Print Order
-    OLKiteViewController *kiteVC = [self kiteVc];
-    if ([kiteVC printOrder]){
-        printOrder = [kiteVC printOrder];
+    OLProductPrintJob *job = [[OLProductPrintJob alloc] initWithTemplateId:self.product.templateId OLAssets:photoAssets];
+    for (id<OLPrintJob> existingJob in printOrder.jobs){
+        if ([existingJob.uuid isEqualToString:self.product.uuid]){
+            if ([existingJob extraCopies] > 0){
+                [existingJob setExtraCopies:[existingJob extraCopies]-1];
+            }
+            else{
+                [printOrder removePrintJob:existingJob];
+            }
+            job.uuid = self.product.uuid;
+        }
     }
-    
-    OLProductPrintJob* printJob = [[OLProductPrintJob alloc] initWithTemplateId:self.product.templateId OLAssets:photoAssets];
-	printJob.uuid = [[NSUUID UUID] UUIDString];
+    self.editingPrintJob = job;
     
     for (NSString *option in self.product.selectedOptions.allKeys){
-        [printJob setValue:self.product.selectedOptions[option] forOption:option];
+        [job setValue:self.product.selectedOptions[option] forOption:option];
     }
     
-    for (id<OLPrintJob> job in printOrder.jobs){
-        [printOrder removePrintJob:job];
+    if ([printOrder.jobs containsObject:self.editingPrintJob]){
+        id<OLPrintJob> existingJob = printOrder.jobs[[printOrder.jobs indexOfObject:self.editingPrintJob]];
+        [existingJob setExtraCopies:[existingJob extraCopies]+1];
     }
-    [printOrder addPrintJob:printJob];
-    
-    if ([kiteVC printOrder]){
-        [kiteVC setPrintOrder:printOrder];
+    else{
+        [printOrder addPrintJob:self.editingPrintJob];
     }
     
-    if ([kiteVC printOrder] && [[OLKiteABTesting sharedInstance].launchWithPrintOrderVariant isEqualToString:@"Review-Overview-Checkout"]){
+    [printOrder saveOrder];
+    
+    if (handler){
+        handler();
+    }
+}
+
+- (void)doCheckout{
+    [self saveJobWithCompletionHandler:NULL];
+    
+    OLPrintOrder *printOrder = [OLKiteUtils kiteVcForViewController:self].printOrder;
+    if ([OLKiteABTesting sharedInstance].launchedWithPrintOrder && [[OLKiteABTesting sharedInstance].launchWithPrintOrderVariant isEqualToString:@"Review-Overview-Checkout"]){
         UIViewController *vc = [self.storyboard instantiateViewControllerWithIdentifier:@"OLProductOverviewViewController"];
         [vc safePerformSelector:@selector(setUserEmail:) withObject:[(OLKiteViewController *)vc userEmail]];
         [vc safePerformSelector:@selector(setUserPhone:) withObject:[(OLKiteViewController *)vc userPhone]];
@@ -269,20 +289,6 @@
             [self.navigationController pushViewController:vc animated:YES];
         }];
     }
-}
-
-- (OLKiteViewController *)kiteVc{
-    UIViewController *vc = self.parentViewController;
-    while (vc) {
-        if ([vc isKindOfClass:[OLKiteViewController class]]){
-            return (OLKiteViewController *)vc;
-            break;
-        }
-        else{
-            vc = vc.parentViewController;
-        }
-    }
-    return nil;
 }
 
 - (IBAction)onButtonEnhanceClicked:(id)sender {
@@ -310,6 +316,7 @@
     [self.editingPrintPhoto getImageWithProgress:NULL completion:^(UIImage *image){
         [cropVc setFullImage:image];
         cropVc.edits = self.editingPrintPhoto.edits;
+        cropVc.modalPresentationStyle = [OLKiteUtils kiteVcForViewController:self].modalPresentationStyle;
         [self presentViewController:cropVc animated:YES completion:NULL];
     }];
 }
@@ -323,10 +330,7 @@
 -(void)scrollCropViewController:(OLScrollCropViewController *)cropper didFinishCroppingImage:(UIImage *)croppedImage{
     [self.editingPrintPhoto unloadImage];
     
-    self.editingPrintPhoto.edits.cropImageFrame = [cropper.cropView getFrameRect];
-    self.editingPrintPhoto.edits.cropImageRect = [cropper.cropView getImageRect];
-    self.editingPrintPhoto.edits.cropImageSize = [cropper.cropView croppedImageSize];
-    self.editingPrintPhoto.edits.cropTransform = [cropper.cropView.imageView transform];
+    self.editingPrintPhoto.edits = cropper.edits;
     
     [self.collectionView reloadData];
     [cropper dismissViewControllerAnimated:YES completion:NULL];

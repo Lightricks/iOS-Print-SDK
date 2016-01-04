@@ -28,8 +28,10 @@ static NSString *const kOLAnalyticsQuantity = @"Quantity";
 static NSString *const kOLAnalyticsItemsInOrder = @"Items In Order";
 static NSString *const kOLAnalyticsOrderCost = @"Order Cost";
 static NSString *const kOLAnalyticsOrderShippingCost = @"Order Shipping Cost";
+static NSString *const kOLAnalyticsCurrencyCode = @"Currency Code";
 static NSString *const kOLAnalyticsItemPrice = @"Item Price";
 static NSString *const kOLAnalyticsPromoCode = @"Promo Code";
+static NSString *const kOLAnalyticsError = @"Error";
 
 @interface OLAnalytics : NSObject
 
@@ -71,6 +73,11 @@ static NSString *const kOLAnalyticsPromoCode = @"Promo Code";
 + (void)trackPaymentScreenHitItemQtyDownForItem:(id<OLPrintJob>)item inOrder:(OLPrintOrder *)printOrder applePayIsAvailable:(NSString *)applePayIsAvailable;
 + (void)trackPaymentScreenHitEditItem:(id<OLPrintJob>)item inOrder:(OLPrintOrder *)printOrder applePayIsAvailable:(NSString *)applePayIsAvailable;
 + (void)trackBasketScreenHitBackForOrder:(OLPrintOrder *)printOrder applePayIsAvailable:(NSString *)applePayIsAvailable;
++ (void)trackPaymentScreenSuccessfullyAppliedPromoCode:(NSString *)code forOrder:(OLPrintOrder *)order;
++ (void)trackPaymentScreenUnsuccessfullyAppliedPromoCode:(NSString *)code withError:(NSError *)error forOrder:(OLPrintOrder *)order;
++ (void)trackPaymentScreenDidTapOnPromoCodeBoxforOrder:(OLPrintOrder *)order;
++ (void)trackPaymentScreenPaymentMethodHit:(NSString *)method forOrder:(OLPrintOrder *)order applePayIsAvailable:(NSString *)applePayIsAvailable;
++ (void)trackPaymentScreenPaymentMethodDidCancel:(NSString *)method forOrder:(OLPrintOrder *)order applePayIsAvailable:(NSString *)applePayIsAvailable;
 + (void)trackPaymentScreenHitEditItemDone:(id<OLPrintJob>)item inOrder:(OLPrintOrder *)printOrder applePayIsAvailable:(NSString *)applePayIsAvailable;
 + (void)trackPaymentScreenDidDeleteItem:(id<OLPrintJob>)item inOrder:(OLPrintOrder *)printOrder applePayIsAvailable:(NSString *)applePayIsAvailable;
 + (void)trackPaymentScreenHitCheckoutForOrder:(OLPrintOrder *)printOrder;
