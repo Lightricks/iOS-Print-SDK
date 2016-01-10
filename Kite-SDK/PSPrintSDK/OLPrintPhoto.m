@@ -30,6 +30,7 @@
 static NSString *const kKeyType = @"co.oceanlabs.psprintstudio.kKeyType";
 static NSString *const kKeyAsset = @"co.oceanlabs.psprintstudio.kKeyAsset";
 static NSString *const kKeyEdits = @"co.oceanlabs.psprintstudio.kKeyEdits";
+static NSString *const kKeyUUID = @"co.oceanlabs.psprintstudio.kKeyUUID";
 
 static NSString *const kKeyExtraCopies = @"co.oceanlabs.psprintstudio.kKeyExtraCopies";
 
@@ -59,6 +60,7 @@ static NSOperationQueue *imageOperationQueue;
 
 @interface OLPrintPhoto ()
 @property (nonatomic, strong) UIImage *cachedCroppedThumbnailImage;
+@property (nonatomic, assign, readwrite) PrintPhotoAssetType type;
 @end
 
 @implementation OLPrintPhoto
@@ -73,6 +75,7 @@ static NSOperationQueue *imageOperationQueue;
 
 - (id)init {
     if (self = [super init]) {
+        self.uuid = [[NSUUID UUID] UUIDString];
     }
     
     return self;
@@ -527,6 +530,7 @@ static NSOperationQueue *imageOperationQueue;
         _type = [aDecoder decodeIntForKey:kKeyType];
         _extraCopies = [aDecoder decodeIntForKey:kKeyExtraCopies];
         _edits = [aDecoder decodeObjectForKey:kKeyEdits];
+        _uuid = [aDecoder decodeObjectForKey:kKeyUUID];
         if (self.type == kPrintPhotoAssetTypeALAsset) {
             NSURL *assetURL = [aDecoder decodeObjectForKey:kKeyAsset];
             [[ALAssetsLibrary defaultAssetsLibrary] assetForURL:assetURL
@@ -574,6 +578,7 @@ static NSOperationQueue *imageOperationQueue;
     [aCoder encodeInteger:self.type forKey:kKeyType];
     [aCoder encodeInteger:self.extraCopies forKey:kKeyExtraCopies];
     [aCoder encodeObject:self.edits forKey:kKeyEdits];
+    [aCoder encodeObject:self.uuid forKey:kKeyUUID];
     if (self.type == kPrintPhotoAssetTypeALAsset) {
         [aCoder encodeObject:[self.asset valueForProperty:ALAssetPropertyAssetURL] forKey:kKeyAsset];
     }
@@ -583,6 +588,17 @@ static NSOperationQueue *imageOperationQueue;
     else {
         [aCoder encodeObject:self.asset forKey:kKeyAsset];
     }
+}
+
+- (id)copyWithZone:(NSZone *)zone{
+    OLPrintPhoto *copy = [[OLPrintPhoto alloc] init];
+    copy.type = self.type;
+    copy.extraCopies = self.extraCopies;
+    copy.edits = [self.edits copyWithZone:zone];
+    copy.uuid = self.uuid;
+    copy.asset = self.asset;
+    
+    return copy;
 }
 
 @end

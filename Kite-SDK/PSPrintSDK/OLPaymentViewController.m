@@ -49,6 +49,8 @@
 #import "OLProductOverviewViewController.h"
 #import "OLOrdersViewController.h"
 #import "OLSingleImageProductReviewViewController.h"
+#import "OLPosterViewController.h"
+#import "OLFrameOrderReviewViewController.h"
 
 #ifdef OL_KITE_OFFER_PAYPAL
 #ifdef COCOAPODS
@@ -634,11 +636,24 @@ UIActionSheetDelegate, UITextFieldDelegate, OLCreditCardCaptureDelegate, UINavig
             [self.paymentButton2 setTitle:NSLocalizedStringFromTableInBundle(@"Credit Card", @"KitePrintSDK", [OLConstants bundle], @"") forState:UIControlStateNormal];
         }
         
-        [self.tableView reloadData];
+        if ([self.tableView numberOfRowsInSection:0] != self.printOrder.jobs.count){
+            [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:0] withRowAnimation:UITableViewRowAnimationNone];
+        }
+        
+        NSString *shippingCostString;
+        NSDecimalNumber *shippingCost = [cost shippingCostInCurrency:self.printOrder.currencyCode];
+        if ([shippingCost isEqualToNumber:@0]){
+            shippingCostString = NSLocalizedString(@"FREE", @"");
+        }
+        else{
+            shippingCostString = [shippingCost formatCostForCurrencyCode:self.printOrder.currencyCode];
+        }
         
         [UIView animateWithDuration:shouldAnimate ? 0.1 : 0 animations:^{
             if (shouldAnimate){
-                self.shippingCostLabel.alpha = 0;
+                if (![self.shippingCostLabel.text isEqualToString:shippingCostString]){
+                    self.shippingCostLabel.alpha = 0;
+                }
                 self.totalCostLabel.alpha = 0;
                 self.totalCostActivityIndicator.alpha = 0;
             }
@@ -649,13 +664,7 @@ UIActionSheetDelegate, UITextFieldDelegate, OLCreditCardCaptureDelegate, UINavig
             [self.totalCostActivityIndicator stopAnimating];
             self.totalCostActivityIndicator.alpha = 1;
             
-            NSDecimalNumber *shippingCost = [cost shippingCostInCurrency:self.printOrder.currencyCode];
-            if ([shippingCost isEqualToNumber:@0]){
-                self.shippingCostLabel.text = NSLocalizedString(@"FREE", @"");
-            }
-            else{
-                self.shippingCostLabel.text = [shippingCost formatCostForCurrencyCode:self.printOrder.currencyCode];
-            }
+            self.shippingCostLabel.text = shippingCostString;
             
             NSDecimalNumber *promoCost = [cost promoCodeDiscountInCurrency:self.printOrder.currencyCode];
             if ([promoCost isEqualToNumber:@0]){
@@ -686,7 +695,17 @@ UIActionSheetDelegate, UITextFieldDelegate, OLCreditCardCaptureDelegate, UINavig
         NSUInteger numSheets = (NSUInteger) ceil([OLProduct productWithTemplateId:[job templateId]].quantityToFulfillOrder / sheetQuanity);
         NSDecimalNumber *unitCost = [sheetCost decimalNumberByMultiplyingBy:[NSDecimalNumber decimalNumberWithString:[NSString stringWithFormat:@"%lu", (unsigned long)numSheets]]];
         
-        expectedCost = [expectedCost decimalNumberByAdding:[unitCost decimalNumberByMultiplyingBy:[NSDecimalNumber decimalNumberWithString:[NSString stringWithFormat:@"%ld", (long)([job extraCopies] + 1)]]]];
+        float numberOfPhotos = [job assetsForUploading].count;
+        if (template.templateUI == kOLTemplateUIPhotobook){
+            // Front cover photo should count towards total photos
+            if ([(OLPhotobookPrintJob *)job frontCover]){
+                numberOfPhotos--;
+            }
+        }
+        
+        NSDecimalNumber *numUnitsInJob = [[NSDecimalNumber alloc] initWithFloat:ceilf(numberOfPhotos / (float) MAX(template.quantityPerSheet, 1))];
+        
+        expectedCost = [expectedCost decimalNumberByAdding:[unitCost decimalNumberByMultiplyingBy:[NSDecimalNumber decimalNumberWithString:[NSString stringWithFormat:@"%ld", (long)([job extraCopies] + 1)*[numUnitsInJob integerValue]]]]];
     }
     [self.printOrder costWithCompletionHandler:^(OLPrintOrderCost *cost, NSError *error){
         NSDecimalNumber *actualCost = [cost totalCostInCurrency:self.printOrder.currencyCode];
@@ -1290,9 +1309,7 @@ UIActionSheetDelegate, UITextFieldDelegate, OLCreditCardCaptureDelegate, UINavig
                 
                 [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:0] withRowAnimation:UITableViewRowAnimationAutomatic];
                 [self.printOrder saveOrder];
-                [self.printOrder costWithCompletionHandler:^(OLPrintOrderCost *cost, NSError *error){
-                    [self costCalculationCompletedWithError:error];
-                }];
+                [self updateViewsBasedOnCostUpdate];
             }]];
             [self presentViewController:ac animated:YES completion:NULL];
         }
@@ -1624,9 +1641,25 @@ UIActionSheetDelegate, UITextFieldDelegate, OLCreditCardCaptureDelegate, UINavig
         }];
         
         quantityLabel.text = [NSString stringWithFormat:@"%ld", (long)[job extraCopies]+1];
-        productNameLabel.text = product.productTemplate.name;
+
+        float numberOfPhotos = [job assetsForUploading].count;
+        if (product.productTemplate.templateUI == kOLTemplateUIPhotobook){
+            // Front cover photo should count towards total photos
+            if ([(OLPhotobookPrintJob *)job frontCover]){
+                numberOfPhotos--;
+            }
+        }
         
-        priceLabel.text = [[[product unitCostDecimalNumber] decimalNumberByMultiplyingBy:[NSDecimalNumber decimalNumberWithString:[NSString stringWithFormat:@"%ld", (long)[job extraCopies]+1]]]formatCostForCurrencyCode:self.printOrder.currencyCode];
+        NSDecimalNumber *numUnitsInJob = [[NSDecimalNumber alloc] initWithFloat:ceilf(numberOfPhotos / (float) product.quantityToFulfillOrder)];
+        
+        priceLabel.text = [[numUnitsInJob decimalNumberByMultiplyingBy:[[product unitCostDecimalNumber] decimalNumberByMultiplyingBy:[NSDecimalNumber decimalNumberWithString:[NSString stringWithFormat:@"%ld", (long)[job extraCopies]+1]]]] formatCostForCurrencyCode:self.printOrder.currencyCode];
+        
+        if ([numUnitsInJob integerValue] == 1){
+            productNameLabel.text = product.productTemplate.name;
+        }
+        else{
+            productNameLabel.text = [NSString stringWithFormat:@"%@ (x %ld)", product.productTemplate.name, (long)[numUnitsInJob integerValue]];
+        }
         
         if ([[[UIDevice currentDevice] systemVersion] floatValue] < 8){
             editButton.hidden = YES;
@@ -1728,21 +1761,46 @@ UIActionSheetDelegate, UITextFieldDelegate, OLCreditCardCaptureDelegate, UINavig
     }
     
     NSMutableArray *userSelectedPhotos = [[NSMutableArray alloc] init];
-    for (OLAsset *asset in [printJob assetsForUploading]){
+    NSMutableSet *addedAssetsUUIDs = [[NSMutableSet alloc] init];
+    
+    NSMutableArray *jobAssets = [[printJob assetsForUploading] mutableCopy];
+    
+    //Special handling of products
+    if (product.productTemplate.templateUI == kOLTemplateUIPhotobook && [(OLPhotobookPrintJob *)printJob frontCover]){
+        //Make sure we don't add the cover photo asset in the book photos
+        OLAsset *asset = [(OLPhotobookPrintJob *)printJob frontCover];
         OLPrintPhoto *printPhoto = [[OLPrintPhoto alloc] init];
         printPhoto.asset = asset;
         
         if ([asset.dataSource isKindOfClass:[OLPrintPhoto class]]){
             printPhoto = (OLPrintPhoto *)asset.dataSource;
         }
-        [userSelectedPhotos addObject:printPhoto];
+        if (printPhoto.uuid){
+            [addedAssetsUUIDs addObject:printPhoto.uuid];
+        }
+    }
+    else if (product.productTemplate.templateUI == kOLTemplateUIPoster){
+        [OLPosterViewController changeOrderOfPhotosInArray:jobAssets forProduct:product];
+    }
+    else if (product.productTemplate.templateUI == kOLTemplateUIFrame){
+        [OLFrameOrderReviewViewController reverseRowsOfPhotosInArray:jobAssets forProduct:product];
     }
     
-    if (product.productTemplate.templateUI == kOLTemplateUIFrame || product.productTemplate.templateUI == kOLTemplateUIPoster){
-        [OLKiteUtils reverseRowsOfPhotosInArray:userSelectedPhotos forProduct:product];
+    for (OLAsset *asset in jobAssets){
+        OLPrintPhoto *printPhoto = [[OLPrintPhoto alloc] init];
+        printPhoto.asset = asset;
+        
+        if ([asset.dataSource isKindOfClass:[OLPrintPhoto class]]){
+            printPhoto = (OLPrintPhoto *)asset.dataSource;
+        }
+        if (![addedAssetsUUIDs containsObject:printPhoto.uuid]){
+            [addedAssetsUUIDs addObject:printPhoto.uuid];
+            [userSelectedPhotos addObject:printPhoto];
+        }
+    
     }
     
-    if ([self shouldShowAddMorePhotos] && product.productTemplate.templateUI != kOLTemplateUICase && product.productTemplate.templateUI != kOLTemplateUIPhotobook && product.productTemplate.templateUI != kOLTemplateUIPostcard){
+    if ([self shouldShowAddMorePhotos] && product.productTemplate.templateUI != kOLTemplateUICase && product.productTemplate.templateUI != kOLTemplateUIPhotobook && product.productTemplate.templateUI != kOLTemplateUIPostcard && !(product.productTemplate.templateUI == kOLTemplateUIPoster && product.productTemplate.gridCountX == 1 && product.productTemplate.gridCountY == 1)){
         OLPhotoSelectionViewController *photoVc = [self.storyboard instantiateViewControllerWithIdentifier:@"PhotoSelectionViewController"];
         photoVc.product = product;
         photoVc.userSelectedPhotos = userSelectedPhotos;

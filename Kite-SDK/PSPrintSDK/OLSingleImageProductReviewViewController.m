@@ -196,7 +196,7 @@ static BOOL hasMoved;
     self.imageDisplayed.edits.cropImageSize = [self.imageCropView croppedImageSize];
     self.imageDisplayed.edits.cropTransform = self.imageCropView.imageView.transform;
     
-    OLAsset *asset = [OLAsset assetWithDataSource:self.imageDisplayed];
+    OLAsset *asset = [OLAsset assetWithDataSource:[self.imageDisplayed copy]];
     
     [asset dataLengthWithCompletionHandler:^(long long dataLength, NSError *error){
         if (dataLength < 40000){

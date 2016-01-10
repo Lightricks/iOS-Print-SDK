@@ -96,8 +96,8 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
     [self.nextButton.titleLabel setFont:[UIFont systemFontOfSize:17]];
     [self.nextButton setTitle:NSLocalizedString(@"Add to Basket", @"") forState:UIControlStateNormal];
     [self.nextButton addTarget:self action:@selector(onButtonNextClicked:) forControlEvents:UIControlEventTouchUpInside];
-    [self.nextButton setBackgroundColor:[UIColor colorWithRed:1.000 green:0.894 blue:0.000 alpha:1.000]];
-    [self.nextButton setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+    [self.nextButton setBackgroundColor:[UIColor colorWithRed:0.125 green:0.498 blue:0.655 alpha:1.000]];
+    [self.nextButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     self.nextButton.frame = CGRectMake(0, self.view.frame.size.height - 40 - ([[UIApplication sharedApplication] statusBarFrame].size.height + self.navigationController.navigationBar.frame.size.height), self.view.frame.size.width, 40);
     [self.collectionView addSubview:self.nextButton];
     
@@ -227,7 +227,7 @@ static const NSUInteger kTagAlertViewDeletePhoto = 98;
     // URL and the user did not manipulate it in any way.
     NSMutableArray *photoAssets = [[NSMutableArray alloc] init];
     for (OLPrintPhoto *photo in self.checkoutPhotos) {
-        [photoAssets addObject:[OLAsset assetWithDataSource:photo]];
+        [photoAssets addObject:[OLAsset assetWithDataSource:[photo copy]]];
     }
     
     // ensure order is maxed out by adding duplicates as necessary

@@ -298,6 +298,7 @@ static const NSUInteger kTagAlertViewSelectMorePhotos = 99;
 - (void)updateTitleBasedOnSelectedPhotoQuanitity {
     if (self.userSelectedPhotos.count == 0) {
         [(UILabel *)self.navigationItem.titleView setText:NSLocalizedString(@"Choose Photos", @"")];
+        [(UILabel *)self.navigationItem.titleView sizeToFit];
     } else {
         if (self.product.quantityToFulfillOrder > 1){
             NSUInteger numOrders = 1 + (MAX(0, self.userSelectedPhotos.count - 1 + [self totalNumberOfExtras]) / self.product.quantityToFulfillOrder);
@@ -579,6 +580,7 @@ static const NSUInteger kTagAlertViewSelectMorePhotos = 99;
     options.networkAccessAllowed = YES;
     [[OLImageCachingManager sharedInstance].photosCachingManager startCachingImagesForAssets:@[asset] targetSize:PHImageManagerMaximumSize contentMode:PHImageContentModeAspectFill options:options];
 }
+#endif
 
 - (BOOL)assetsPickerController:(id)picker shouldSelectAsset:(id)asset
 {
@@ -630,7 +632,6 @@ static const NSUInteger kTagAlertViewSelectMorePhotos = 99;
     [self.userSelectedPhotos addObjectsFromArray:tempUserSelected];
     return result;
 }
-#endif
 
 - (BOOL)assetsPickerController:(OLAssetsPickerController *)picker shouldShowAsset:(id)asset{
     NSString *fileName = [[[asset defaultRepresentation] filename] lowercaseString];

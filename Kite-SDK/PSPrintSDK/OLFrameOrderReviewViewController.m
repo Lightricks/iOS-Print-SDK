@@ -64,8 +64,9 @@ CGFloat margin = 2;
     for (NSUInteger i = 0; i < duplicatesToFillOrder; ++i) {
         [self.framePhotos addObject:self.userSelectedPhotos[i % userSelectedAssetCount]];
     }
+#ifdef OL_VERBOSE
     NSLog(@"Adding %lu duplicates to frame", (unsigned long)duplicatesToFillOrder);
-    [super viewDidLoad];
+#endif
     
     self.title = NSLocalizedString(@"Review", @"");
 }
@@ -99,10 +100,10 @@ CGFloat margin = 2;
     }];
 }
 
--(void)changeOrderOfPhotosInArray:(NSMutableArray*)array{
-    NSUInteger photosPerRow = sqrt(self.product.quantityToFulfillOrder);
++(void)reverseRowsOfPhotosInArray:(NSMutableArray*)array forProduct:(OLProduct *)product{
+    NSUInteger photosPerRow = sqrt(product.quantityToFulfillOrder);
     NSUInteger numberOfRows = [array count] / photosPerRow;
-
+    
     NSMutableArray* rows = [[NSMutableArray alloc] initWithCapacity:numberOfRows];
     for (NSUInteger rowNumber = 0; rowNumber < numberOfRows; rowNumber++){
         NSMutableArray* row = [[NSMutableArray alloc] initWithCapacity:photosPerRow];
@@ -119,8 +120,9 @@ CGFloat margin = 2;
 }
 
 - (void)preparePhotosForCheckout{
-    [self changeOrderOfPhotosInArray:self.framePhotos];
-    self.checkoutPhotos = self.framePhotos;
+    NSMutableArray *reversePhotos = [self.framePhotos mutableCopy];
+    [OLFrameOrderReviewViewController reverseRowsOfPhotosInArray:reversePhotos forProduct:self.product];
+    self.checkoutPhotos = reversePhotos;
 }
 
 - (BOOL)shouldShowAddMorePhotos{

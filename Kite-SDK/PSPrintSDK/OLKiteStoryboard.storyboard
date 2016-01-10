@@ -1536,14 +1536,14 @@
                             </view>
                             <button opaque="NO" tag="20" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="gw5-Cz-eSf">
                                 <rect key="frame" x="446" y="534" width="138" height="46"/>
-                                <color key="backgroundColor" red="1" green="0.89411764709999997" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                <color key="backgroundColor" red="0.12549019610000001" green="0.49803921569999998" blue="0.65490196079999996" alpha="1" colorSpace="calibratedRGB"/>
                                 <constraints>
                                     <constraint firstAttribute="width" constant="138" id="vi3-9q-9xH"/>
                                     <constraint firstAttribute="height" constant="46" id="y6f-GI-Ghj"/>
                                 </constraints>
                                 <fontDescription key="fontDescription" type="system" pointSize="17"/>
                                 <state key="normal" title="Add to Basket">
-                                    <color key="titleColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                    <color key="titleColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
                                     <color key="titleShadowColor" white="0.5" alpha="1" colorSpace="calibratedWhite"/>
                                 </state>
                                 <connections>
@@ -1665,7 +1665,7 @@
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                         <subviews>
                             <collectionView opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" alpha="0.0" contentMode="scaleToFill" alwaysBounceVertical="YES" showsHorizontalScrollIndicator="NO" showsVerticalScrollIndicator="NO" minimumZoomScale="0.0" maximumZoomScale="0.0" dataMode="prototypes" translatesAutoresizingMaskIntoConstraints="NO" id="7XX-0J-tJc">
-                                <rect key="frame" x="0.0" y="87" width="600" height="513"/>
+                                <rect key="frame" x="0.0" y="87" width="600" height="473"/>
                                 <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="calibratedWhite"/>
                                 <collectionViewLayout key="collectionViewLayout" id="DcK-XV-eBn" customClass="LXReorderableCollectionViewFlowLayout"/>
                                 <cells>
@@ -1705,13 +1705,13 @@
                             </collectionView>
                             <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="0Zs-Gf-EDY">
                                 <rect key="frame" x="0.0" y="560" width="600" height="40"/>
-                                <color key="backgroundColor" red="1" green="0.89411764709999997" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                <color key="backgroundColor" red="0.12549019610000001" green="0.49803921569999998" blue="0.65490196079999996" alpha="1" colorSpace="calibratedRGB"/>
                                 <constraints>
                                     <constraint firstAttribute="height" constant="40" id="AfA-p6-Qin"/>
                                 </constraints>
                                 <fontDescription key="fontDescription" type="system" pointSize="17"/>
                                 <state key="normal" title="Next">
-                                    <color key="titleColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                    <color key="titleColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
                                 </state>
                                 <connections>
                                     <action selector="onButtonNextClicked" destination="5M4-me-Xph" eventType="touchUpInside" id="X3P-fY-TQC"/>
@@ -1934,6 +1934,7 @@
                             <constraint firstItem="Bco-ct-3Yg" firstAttribute="height" secondItem="TIp-Hm-PTo" secondAttribute="height" id="6xo-KW-gGX"/>
                             <constraint firstItem="9nk-DX-0TW" firstAttribute="leading" secondItem="Bco-ct-3Yg" secondAttribute="trailing" priority="750" id="7TB-bO-5yf"/>
                             <constraint firstItem="Bco-ct-3Yg" firstAttribute="top" secondItem="Prc-x4-bQB" secondAttribute="bottom" id="9e4-gB-SEF"/>
+                            <constraint firstItem="0Zs-Gf-EDY" firstAttribute="top" secondItem="7XX-0J-tJc" secondAttribute="bottom" id="BDM-GZ-d3e"/>
                             <constraint firstItem="Bco-ct-3Yg" firstAttribute="leading" secondItem="H6l-Sv-Ai2" secondAttribute="leading" id="C3a-eD-lxd"/>
                             <constraint firstItem="Qmw-15-obN" firstAttribute="top" secondItem="Prc-x4-bQB" secondAttribute="bottom" constant="20" id="F6f-ve-u56"/>
                             <constraint firstItem="SHl-5H-G7O" firstAttribute="top" secondItem="934-Aw-K7I" secondAttribute="bottom" id="FtF-wn-6UH"/>
@@ -1960,6 +1961,11 @@
                             <constraint firstAttribute="trailing" secondItem="qWq-HB-FzX" secondAttribute="trailing" id="xD0-6m-Usz"/>
                             <constraint firstItem="SHl-5H-G7O" firstAttribute="top" secondItem="0Zs-Gf-EDY" secondAttribute="bottom" id="ymL-i1-h2W"/>
                         </constraints>
+                        <variation key="default">
+                            <mask key="constraints">
+                                <exclude reference="lMV-dK-VcX"/>
+                            </mask>
+                        </variation>
                     </view>
                     <navigationItem key="navigationItem" title="Choose Photos" id="tKz-hT-vzu">
                         <barButtonItem key="backBarButtonItem" title="Back" id="VT4-Qp-U1T"/>
@@ -1968,6 +1974,7 @@
                         <outlet property="buttonFacebookImport" destination="3Qz-eK-tvU" id="1nW-1a-YZa"/>
                         <outlet property="buttonGalleryImport" destination="R1h-WW-in1" id="OEX-bL-9cY"/>
                         <outlet property="buttonInstagramImport" destination="nlZ-9G-2DN" id="n3b-Da-89z"/>
+                        <outlet property="buttonNext" destination="0Zs-Gf-EDY" id="heq-1V-RuE"/>
                         <outlet property="cameraRollContainer" destination="ygM-3Q-VpC" id="lww-HG-txe"/>
                         <outlet property="chooseImportSourceLabel" destination="Qmw-15-obN" id="KvT-Nk-W95"/>
                         <outlet property="clearButtonContainerView" destination="qWq-HB-FzX" id="QLT-9W-jgq"/>
@@ -2587,13 +2594,13 @@
                             </view>
                             <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="sot-G1-rGw">
                                 <rect key="frame" x="0.0" y="560" width="600" height="40"/>
-                                <color key="backgroundColor" red="1" green="0.89411764709999997" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                <color key="backgroundColor" red="0.12549019610000001" green="0.49803921569999998" blue="0.65490196079999996" alpha="1" colorSpace="calibratedRGB"/>
                                 <constraints>
                                     <constraint firstAttribute="height" constant="40" id="HjL-Rw-h8y"/>
                                 </constraints>
                                 <fontDescription key="fontDescription" type="system" pointSize="17"/>
                                 <state key="normal" title="Add to Basket">
-                                    <color key="titleColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                    <color key="titleColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
                                 </state>
                                 <connections>
                                     <action selector="onButtonCallToActionClicked:" destination="0Cd-3J-LPU" eventType="touchUpInside" id="tYU-gP-obi"/>
@@ -2675,14 +2682,14 @@
                             </view>
                             <button opaque="NO" tag="20" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="ZlI-Gw-kac">
                                 <rect key="frame" x="446" y="534" width="138" height="46"/>
-                                <color key="backgroundColor" red="1" green="0.89411764709999997" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                <color key="backgroundColor" red="0.12549019610000001" green="0.49803921569999998" blue="0.65490196079999996" alpha="1" colorSpace="calibratedRGB"/>
                                 <constraints>
                                     <constraint firstAttribute="height" constant="46" id="bx4-3g-ZU4"/>
                                     <constraint firstAttribute="width" constant="138" id="rtP-Mj-2NW"/>
                                 </constraints>
                                 <fontDescription key="fontDescription" type="system" pointSize="17"/>
                                 <state key="normal" title="Add to Basket">
-                                    <color key="titleColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                    <color key="titleColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
                                     <color key="titleShadowColor" white="0.5" alpha="1" colorSpace="calibratedWhite"/>
                                 </state>
                                 <connections>
@@ -2903,14 +2910,14 @@
                             </view>
                             <button opaque="NO" tag="20" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="BCp-TW-Lv4">
                                 <rect key="frame" x="446" y="534" width="138" height="46"/>
-                                <color key="backgroundColor" red="1" green="0.89411764709999997" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                <color key="backgroundColor" red="0.12549019610000001" green="0.49803921569999998" blue="0.65490196079999996" alpha="1" colorSpace="calibratedRGB"/>
                                 <constraints>
                                     <constraint firstAttribute="width" constant="138" id="obc-ie-vhV"/>
                                     <constraint firstAttribute="height" constant="46" id="sda-Dd-bn2"/>
                                 </constraints>
                                 <fontDescription key="fontDescription" type="system" pointSize="17"/>
                                 <state key="normal" title="Add to Basket">
-                                    <color key="titleColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                    <color key="titleColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
                                     <color key="titleShadowColor" white="0.5" alpha="1" colorSpace="calibratedWhite"/>
                                 </state>
                                 <connections>
@@ -3071,13 +3078,13 @@
                             </view>
                             <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="JzC-Vn-8gQ">
                                 <rect key="frame" x="0.0" y="560" width="600" height="40"/>
-                                <color key="backgroundColor" red="1" green="0.89411764709999997" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                <color key="backgroundColor" red="0.12549019610000001" green="0.49803921569999998" blue="0.65490196079999996" alpha="1" colorSpace="calibratedRGB"/>
                                 <constraints>
                                     <constraint firstAttribute="height" constant="40" id="mET-5O-GuO"/>
                                 </constraints>
                                 <fontDescription key="fontDescription" type="system" pointSize="17"/>
                                 <state key="normal" title="Start Creating">
-                                    <color key="titleColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="calibratedRGB"/>
+                                    <color key="titleColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
                                 </state>
                                 <connections>
                                     <action selector="onButtonCallToActionClicked:" destination="0Cd-3J-LPU" eventType="touchUpInside" id="fNw-Xs-sgQ"/>

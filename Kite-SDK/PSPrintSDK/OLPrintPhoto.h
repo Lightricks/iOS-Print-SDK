@@ -22,7 +22,7 @@ typedef enum {
     kPrintPhotoAssetTypeFacebookPhoto
 } PrintPhotoAssetType;
 
-@interface OLPrintPhoto : NSObject <OLAssetDataSource>
+@interface OLPrintPhoto : NSObject <OLAssetDataSource, NSCopying, NSCoding>
 
 - (void)setImageSize:(CGSize)destSize cropped:(BOOL)cropped progress:(OLImageEditorImageGetImageProgressHandler)progressHandler completionHandler:(void(^)(UIImage *image))handler;
 - (void)getImageWithProgress:(OLImageEditorImageGetImageProgressHandler)progressHandler completion:(OLImageEditorImageGetImageCompletionHandler)completionHandler;
@@ -33,5 +33,6 @@ typedef enum {
 @property (nonatomic, strong) id asset;
 @property (assign, nonatomic) NSInteger extraCopies;
 @property (strong, nonatomic) OLPhotoEdits *edits;
+@property (strong, nonatomic) NSString *uuid;
 
 @end
